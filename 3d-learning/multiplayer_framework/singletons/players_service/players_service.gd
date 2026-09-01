@@ -1,0 +1,298 @@
+extends Node2D
+
+## CONSTANTS
+signal player_added(player: Player)
+signal player_removing(player: Player)
+signal server_shutdown
+
+## VARIABLES
+var _players: Dictionary[int, Player] = {}
+var local_player: Player = null
+
+## BUILT-IN METHODS
+func _ready():
+	multiplayer.peer_connected.connect(_on_peer_connected)
+	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+	
+	multiplayer.server_disconnected.connect(_on_server_disconnected)
+	
+## PUBLICS
+
+## Call this function to setup the host player for both single player and multiplayer.
+## Most MultiplayerPeer implementation will have the server be the client who hosted.
+func setup_host_player() -> void:
+	var host_player = Player.new()
+	host_player.peer_id = 1
+	host_player.name = _get_player_username_from_steam(1)
+	
+	_players[1] = host_player
+	local_player = host_player
+	
+	player_added.emit(host_player)
+	
+	
+## Call this function when the host leaves to gracefully handle server shutdown.
+## This is absolutely needed if a client can be the host.
+func clean_up_host_player() -> void:
+	_clear_service_data()
+	server_shutdown.emit()
+	
+	
+## Client-to-Server: Notifies the host that this peer finished loading their map scene
+func notify_server_scene_ready() -> void:
+	if is_server(): 
+		return
+	_rpc_client_ready_to_spawn.rpc_id(1)
+	
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_client_ready_to_spawn() -> void:
+	if not is_server(): 
+		return
+		
+	var incoming_peer_id = multiplayer.get_remote_sender_id()
+	
+	if _players.has(incoming_peer_id):
+		print_debug("Warning: Security Exception. Peer ", incoming_peer_id, " attempted duplicate registration!")
+		return
+		
+	print("[PlayersService] Peer ", incoming_peer_id, " map loaded successfully. Registering the player now.")
+	_register_and_sync_new_player(incoming_peer_id)
+	
+	
+## Gets all connected players
+func get_players() -> Array[Player]:
+	return _players.values()
+	
+	
+## Gets the correspoding Player from their character.
+## Returns null if invalid.
+func get_player_from_character(char_node: Node) -> Player:
+	for p: Player in _players.values():
+		if p.character == char_node:
+			return p
+	return null
+	
+	
+## Server Only: Sets the Player character and then syncs across to clients
+func set_player_character(player: Player, char_node: Node) -> void:
+	if not is_server():
+		return
+	
+	_rpc_set_player_character.rpc(player.peer_id, char_node.get_path())	
+	
+@rpc("authority", "call_local", "reliable")
+func _rpc_set_player_character(peer_id: int, char_node_path: NodePath) -> void:
+	if not _players.has(peer_id):
+		return
+		
+	if has_node(char_node_path):
+		_players[peer_id].character = get_node(char_node_path)
+		return
+		
+	# Wait for arrival by using node_added signal
+	var root = get_tree()
+	var listener: Callable
+	listener = func(node: Node):
+		if node.get_path() == char_node_path:
+			_players[peer_id].character = node
+			root.node_added.disconnect(listener)
+	root.node_added.connect(listener)
+	
+	
+## Safely fetches a Player object by their peer_id. Returns null if not found.
+func get_player_from_peer_id(peer_id: int) -> Player:
+	return _players.get(peer_id, null)
+	
+	
+## Checks whether the current running peer is the server.
+func is_server():
+	return multiplayer.is_server() if multiplayer.has_multiplayer_peer() else true
+	
+	
+## Server-only: Updates a Player's stat and replicates it out to all clients.
+func set_stat(player: Player, stat_name: String, value: Variant) -> void:
+	if not is_server():
+		print_debug("Warning: Authoritative Server rule violation. Only the server can change stats!")
+		return
+		
+	_rpc_set_stat.rpc(player.peer_id, stat_name, value)
+	
+@rpc("authority", "call_local", "reliable")
+func _rpc_set_stat(peer_id: int, stat_name: String, value: Variant) -> void:
+	if _players.has(peer_id):
+		print("On peer ", multiplayer.get_unique_id(), " set peer ", peer_id, " stat of ", stat_name, " to ", value)
+		_players[peer_id].stats.set_value(stat_name, value)
+		
+		
+## Safely fetches a stat from a specific Player's stats.
+func get_stat(player: Player, stat_name: String, default: Variant = 0) -> Variant:
+	var peer_id = player.peer_id
+	
+	if _players.has(peer_id):
+		return _players[peer_id].stats.get_value(stat_name, default)
+	return default
+	
+	
+## Server-only: Forcefully disconnects a player from the game session.
+func kick_player(player: Player, reason: String = "Kicked from server!") -> void:
+	if not is_server():
+		print_debug("Warning: Only the server can kick!")
+		return
+		
+	# No kicking self
+	var peer_id = player.peer_id
+	if peer_id == 1 or peer_id == multiplayer.get_unique_id():
+		return
+		
+	print("Kicking Peer ID: ", peer_id, " Reason: ", reason)
+		
+	if multiplayer.has_multiplayer_peer():
+		# This should trigger multiplayer.peer_disconnected signal
+		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
+		
+		
+## PRIVATES
+
+## Fetches the player username from Steam.
+func _get_player_username_from_steam(peer_id: int) -> String:
+	# If Steam isn't active or loaded, fallback immediately
+	if not ClassDB.class_exists("Steam"):
+		return "Player_" + str(peer_id)
+		
+	# If it's the current user who requested it,
+	# fetch their local Steam profile name
+	if peer_id == 1 or peer_id == multiplayer.get_unique_id():
+		return Steam.getPersonaName()
+		
+	# Otherwise, extract their Steam ID from requester's SteamMultiplayerPeer
+	if multiplayer.has_multiplayer_peer():
+		var peer = multiplayer.multiplayer_peer as SteamMultiplayerPeer
+		if peer:
+			var steam_id: int = peer.get_steam_id_for_peer_id(peer_id)
+			if steam_id > 0:
+				return Steam.getFriendPersonaName(steam_id)
+		
+	return "Player_" + str(peer_id)
+	
+## Server-side handling upon peer connection.
+func _on_peer_connected(peer_id: int) -> void:
+	if not is_server():
+		return
+	print("[PlayersService] Raw peer socket opened for: ", peer_id, ". Waiting for scene handshake...")
+	
+	
+## Server-side handling of Player creation upon peer connection.
+func _register_and_sync_new_player(peer_id: int) -> void:
+	if not is_server():
+		return
+		
+	# Create the new peer's Player on the server
+	var new_player = Player.new()
+	new_player.peer_id = peer_id
+	new_player.name = _get_player_username_from_steam(peer_id)
+	
+	# Try to load stats from a file, database, or assign default starting stats here if needed
+	# Either the player already has saved data somewhere OR
+	# They are new so default stats will be initialized in player_stats.gd by the Dictionary
+	# TODO
+		
+	# Sync existing Players to the newly connected peer
+	for existing_peer_id in _players.keys():
+		var existing_player = _players[existing_peer_id]
+		_rpc_on_peer_connected.rpc_id(
+			peer_id, 
+			existing_peer_id, 
+			existing_player.name
+		)
+		
+		# Sync the stats of the existing player
+		for stat_name in existing_player.stats._data.keys():
+			var stat_val = existing_player.stats.get_value(stat_name)
+			_rpc_set_stat.rpc_id(
+				peer_id, 
+				existing_peer_id, 
+				stat_name, 
+				stat_val
+			)
+			
+		# Sync the character of the existing player
+		if existing_player.character and is_instance_valid(existing_player.character):
+			_rpc_set_player_character.rpc_id(
+				peer_id,
+				existing_peer_id,
+				existing_player.character.get_path()
+			)
+	
+	_players[peer_id] = new_player
+	
+	# Broadcast to EVERYONE about the addition of the new Player
+	_rpc_on_peer_connected.rpc(peer_id, new_player.name)
+	
+	# Broadcast the newcomer's stats out to everyone else!
+	for stat_name in new_player.stats._data.keys():
+		var stat_val = new_player.stats.get_value(stat_name)
+		_rpc_set_stat.rpc(peer_id, stat_name, stat_val)
+		
+	player_added.emit(new_player)
+	
+## Client sync of a new Player upon peer connection.
+@rpc("authority", "call_local", "reliable")
+func _rpc_on_peer_connected(peer_id: int, incoming_name: String) -> void:
+	# For the host, already registered ourselves and clients manually, 
+	# so we don't want to duplicate data.
+	if _players.has(peer_id):
+		return
+		
+	var new_player = Player.new()
+	new_player.peer_id = peer_id
+	new_player.name = incoming_name
+	
+	_players[peer_id] = new_player
+	
+	# Check if the newly added player belongs to the local player
+	if peer_id == multiplayer.get_unique_id():
+		local_player = new_player
+	
+	player_added.emit(new_player)
+	
+	
+## Server-side handling of Player destruction upon peer disconnection.
+func _on_peer_disconnected(peer_id: int) -> void:
+	if not is_server():
+		return
+		
+	# Broadcasts the removal to everyone (including server)
+	_rpc_on_peer_disconnected.rpc(peer_id)
+		
+## Client sync of a Player removal upon peer disconnection.
+@rpc("authority", "call_local", "reliable")
+func _rpc_on_peer_disconnected(peer_id: int) -> void:
+	if _players.has(peer_id):
+		var dropping_player = _players[peer_id]
+		player_removing.emit(dropping_player)
+		_players.erase(peer_id)
+		
+		if dropping_player.character and is_instance_valid(dropping_player.character):
+			dropping_player.character.queue_free()
+		
+		
+## Called when the server shutdowns/leaves.
+## All peers will call this themselves. Server doesn't broadcast.
+## Will automically be called once the server disconnects.
+func _on_server_disconnected() -> void:
+	_clear_service_data()
+	server_shutdown.emit()
+	
+## Resets the service state/data.
+func _clear_service_data() -> void:
+	for peer_id in _players.keys():
+		# Cannot simply call _rpc_on_peer_disconnected 
+		# because this will be called locally
+		var dropping_player = _players[peer_id]
+		player_removing.emit(dropping_player)
+		
+		if dropping_player.character and is_instance_valid(dropping_player.character):
+			dropping_player.character.queue_free()
+		
+	_players.clear()
+	local_player = null
