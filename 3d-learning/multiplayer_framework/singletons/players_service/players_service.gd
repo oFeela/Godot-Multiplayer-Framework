@@ -16,6 +16,18 @@ func _ready():
 	
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	
+	# Stop Godot from instantly killing the process on window close
+	get_tree().set_auto_accept_quit(false)
+	
+	
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if is_server():
+			clean_up_host_player()
+		get_tree().quit()
+	
+	
+	
 ## PUBLICS
 
 ## Call this function to setup the host player for both single player and multiplayer.
@@ -23,7 +35,7 @@ func _ready():
 func setup_host_player() -> void:
 	var host_player = Player.new()
 	host_player.peer_id = 1
-	host_player.name = _get_player_username_from_steam(1)
+	host_player.name = _get_player_name_from_steam(1)
 	
 	_players[1] = host_player
 	local_player = host_player
@@ -154,9 +166,9 @@ func kick_player(player: Player, reason: String = "Kicked from server!") -> void
 ## PRIVATES
 
 ## Fetches the player username from Steam.
-func _get_player_username_from_steam(peer_id: int) -> String:
+func _get_player_name_from_steam(peer_id: int) -> String:
 	# If Steam isn't active or loaded, fallback immediately
-	if not ClassDB.class_exists("Steam"):
+	if not ClassDB.class_exists("Steam") or not Steam.isSteamRunning():
 		return "Player_" + str(peer_id)
 		
 	# If it's the current user who requested it,
@@ -189,7 +201,7 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 	# Create the new peer's Player on the server
 	var new_player = Player.new()
 	new_player.peer_id = peer_id
-	new_player.name = _get_player_username_from_steam(peer_id)
+	new_player.name = _get_player_name_from_steam(peer_id)
 	
 	# Try to load stats from a file, database, or assign default starting stats here if needed
 	# Either the player already has saved data somewhere OR

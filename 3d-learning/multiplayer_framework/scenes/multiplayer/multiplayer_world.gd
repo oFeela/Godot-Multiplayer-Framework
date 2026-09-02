@@ -35,14 +35,19 @@ func _ready() -> void:
 				PlayersService.local_player, 
 				"Level",
 				PlayersService.get_stat(PlayersService.local_player, "Level")
+				+ 1
 			)
 			
 			for player in PlayersService.get_players():
+				print(player.name)
 				print(player.stats._data)
 				print(player.character)
-	
+				
+				
 func _process(delta: float) -> void:
 	pass
+	
+	
 	
 ## PUBLICS
 
@@ -109,7 +114,7 @@ func _on_player_character_freed(player: Player):
 	print("[Workspace] ", player.name, " avatar was freed. Initiating ", "%.1f" % respawn_time, "-second respawn...")
 	await get_tree().create_timer(respawn_time).timeout
 	
-	# Respawn them. 
+	# Respawn them.
 	# They won't respawn if 'auto_spawn' is false already handled inside.
 	_on_player_joined_server(player)
 	
@@ -138,4 +143,4 @@ func _on_player_joined_server(player: Player) -> void:
 		
 ## Server-Authoritative clean up
 func _on_player_left_server(player: Player) -> void:
-	pass
+	print(player.name, " left the server!")
