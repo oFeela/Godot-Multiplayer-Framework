@@ -44,7 +44,9 @@ func _ready() -> void:
 			await get_tree().create_timer(1).timeout
 			print(PlayerDataManager._profiles)
 			for p: Player in PlayersService.get_players():
-				var profile = PlayerDataManager._profiles[p]
+				var profile = PlayerDataManager._profiles.get(p, null)
+				if not profile: continue
+				
 				profile.set_value("coins", profile.get_value("coins", 0) + 100)
 				print(p.name, profile.data)
 	

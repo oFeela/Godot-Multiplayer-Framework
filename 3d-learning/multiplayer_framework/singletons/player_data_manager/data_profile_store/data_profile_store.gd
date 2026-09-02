@@ -213,11 +213,8 @@ func _generate_hmac(content: String) -> String:
 	return hmac.hex_encode()
 	
 	
-func _verify_hmac_signature(data_dict: Dictionary, signature: String) -> bool:
-	var clean_data = data_dict.duplicate(true)
-	_cast_dict_types(clean_data, template)
-	
-	var data_json_string = JSON.stringify(clean_data, "\t")
+func _verify_hmac_signature(data_dict: Dictionary, signature: String) -> bool:	
+	var data_json_string = JSON.stringify(data_dict, "\t")
 	var expected_hash = _generate_hmac(data_json_string)
 	
 	return expected_hash == signature
@@ -244,26 +241,24 @@ func _read_local_disk_package(key: String) -> Dictionary:
 	if json.parse(file.get_as_text()) != OK or typeof(json.data) != TYPE_DICTIONARY:
 		return {"data": template.duplicate(true), "signature": ""} # Same as above if failed
 		
+	var clean_data = json.data["data"].duplicate(true)
+	_cast_dict_types(clean_data, template)
+	json.data["data"] = clean_data
+	
 	return json.data
 	
 	
 func _read_local_disk(key: String) -> Dictionary:
 	var package = _read_local_disk_package(key)
-	
-	if not package.has("data"):
-		return template.duplicate(true)
-		
-	var clean_data = package["data"].duplicate(true)
-	_cast_dict_types(clean_data, template)
 
-	if package.has("signature"):
-		if _verify_hmac_signature(clean_data, package["signature"]):
-			return clean_data
+	if package.has("data") and package.has("signature"):
+		if _verify_hmac_signature(package["data"], package["signature"]):
+			return package["data"]
 		else:
 			push_warning("[DataProfileStore] Local save signature invalid. Tampered data detected. Falling back to template.")
 			return template.duplicate(true)
 			
-	return clean_data
+	return package.get("data", template.duplicate(true))
 	
 	
 func _cast_dict_types(data: Dictionary, template_ref: Dictionary) -> void:

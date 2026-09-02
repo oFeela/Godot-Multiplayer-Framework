@@ -24,7 +24,7 @@ func _ready():
 	
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		leave_server()
+		await leave_server()
 		get_tree().quit()
 	
 	
@@ -185,22 +185,54 @@ func kick_player(player: Player, reason: String = "Kicked from server!") -> void
 		return
 		
 	var peer_id = player.peer_id
-		
 	print("Kicking Peer ID: ", peer_id, " Reason: ", reason)
 	
 	# For server kick
 	if peer_id == 1 or peer_id == multiplayer.get_unique_id():
-		leave_server()
+		await leave_server()
 		return
 		
 	if multiplayer.has_multiplayer_peer():
-		# This should trigger multiplayer.peer_disconnected signal
+		_remove_player_internal(peer_id)
+		await get_tree().create_timer(0.05).timeout
 		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
 		
 		
 ## Call this function when a client/server voluntarily wants to leave the server.
 func leave_server() -> void:
 	server_shutting_down.emit()
+	
+	if multiplayer.has_multiplayer_peer():
+		if RunService.is_server():
+			_clear_service_data()
+			
+			# Yield to give network buffer time to flush save RPCs to clients
+			await get_tree().create_timer(0.2).timeout
+		else:
+			# Ask server to process player_removing over open socket
+			_rpc_request_graceful_leave.rpc_id(1)
+			
+			# Fallback timeout in case server drops unexpectedly
+			await get_tree().create_timer(1.0).timeout
+			_clear_service_data()
+			
+	if multiplayer.has_multiplayer_peer():
+		multiplayer.multiplayer_peer.close()
+		
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_request_graceful_leave() -> void:
+	if not RunService.is_server():
+		return
+		
+	var sender_id = multiplayer.get_remote_sender_id()
+	if has_player(sender_id):
+		_remove_player_internal(sender_id)
+		await get_tree().create_timer(0.1).timeout
+		
+	_rpc_acknowledge_leave.rpc_id(sender_id)
+	
+@rpc("authority", "call_remote", "reliable")
+func _rpc_acknowledge_leave() -> void:
 	_clear_service_data()
 	
 	if multiplayer.has_multiplayer_peer():
@@ -248,11 +280,6 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 	new_player.peer_id = peer_id
 	new_player.name = _get_player_name_from_steam(peer_id)
 	
-	# Try to load stats from a file, database, or assign default starting stats here if needed
-	# Either the player already has saved data somewhere OR
-	# They are new so default stats will be initialized in player_stats.gd by the Dictionary
-	# TODO
-		
 	# Sync existing Players to the newly connected peer
 	for existing_peer_id in _players.keys():
 		var existing_player = _players[existing_peer_id]
@@ -292,6 +319,7 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 		
 	player_added.emit(new_player)
 	
+	
 ## Client sync of a new Player upon peer connection.
 @rpc("authority", "call_local", "reliable")
 func _rpc_on_peer_connected(peer_id: int, incoming_name: String) -> void:
@@ -318,18 +346,11 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	if not RunService.is_server():
 		return
 		
-	# Broadcasts the removal to everyone (including server) FIRST
-	# so that 'player_removing' is emitted first and player_id can be used before clearance
-	_rpc_on_peer_disconnected.rpc(peer_id)
+	_remove_player_internal(peer_id)
 	
-	# Only need to remove on server, because player_id is not replicated!
-	if _peer_to_player_id.has(peer_id):
-		_peer_to_player_id.erase(peer_id)
-		
-	print(_peer_to_player_id)
-		
+	
 ## Client sync of a Player removal upon peer disconnection.
-@rpc("authority", "call_local", "reliable")
+@rpc("authority", "call_remote", "reliable")
 func _rpc_on_peer_disconnected(peer_id: int) -> void:
 	if has_player(peer_id):
 		var dropping_player = _players[peer_id]
@@ -338,6 +359,25 @@ func _rpc_on_peer_disconnected(peer_id: int) -> void:
 		
 		if dropping_player.character and is_instance_valid(dropping_player.character):
 			dropping_player.character.queue_free()
+			
+			
+## Server-only: Handles local removal, signal emission, and replication.
+func _remove_player_internal(peer_id: int) -> void:
+	if not has_player(peer_id):
+		return
+		
+	var dropping_player = _players[peer_id]
+	player_removing.emit(dropping_player)
+
+	if dropping_player.character and is_instance_valid(dropping_player.character):
+		dropping_player.character.queue_free()
+		
+	_players.erase(peer_id)
+	_peer_to_player_id.erase(peer_id)
+	
+	# If server, replicate to others
+	if RunService.is_server():
+		_rpc_on_peer_disconnected.rpc(peer_id)
 		
 		
 ## Will automically be called once the server disconnects

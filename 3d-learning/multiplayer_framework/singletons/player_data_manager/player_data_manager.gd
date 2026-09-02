@@ -33,6 +33,9 @@ func _ready() -> void:
 	PlayersService.player_added.connect(_on_player_added)
 	PlayersService.player_removing.connect(_on_player_removing)
 	
+	# Shutdown signal
+	PlayersService.server_shutting_down.connect(_on_server_shutting_down)
+	
 	
 ## PRIVATES
 func _on_player_added(player: Player):
@@ -65,16 +68,16 @@ func _on_player_added(player: Player):
 func _on_profile_ready(player: Player, profile: DataProfile) -> void:
 	profile.unlocked.connect(func():
 		_profiles.erase(player)
-		PlayersService.kick_player(
-			player,
-			"Main data profile session ended. Should not still be in the server."
-		)
+		#PlayersService.kick_player(
+			#player,
+			#"Main data profile session ended. Should not still be in the server."
+		#)
 	)
 	
 	# Just in case they did not disconnect
 	if player in PlayersService.get_players():
 		_profiles[player] = profile
-		print("Profile loaded for %s!" % player.name)
+		print("[PlayerDataManager] Profile loaded for %s!" % player.name)
 		
 		# Usage exmaple
 		profile.data["coins"] += 100 # Direct but won't trigger signal
@@ -90,3 +93,18 @@ func _on_player_removing(player: Player) -> void:
 	var profile = _profiles.get(player, null)
 	if profile:
 		player_data_store.unload_profile(profile)
+		
+		
+func _on_server_shutting_down() -> void:
+	if not RunService.is_server():
+		return
+		
+	print("[PlayerDataManager] Server shutting down, flushing all active profiles...")
+	
+	var active_players = _profiles.keys().duplicate()
+	for player in active_players:
+		var profile = _profiles.get(player, null)
+		if profile:
+			player_data_store.unload_profile(profile)
+			
+	_profiles.clear()
