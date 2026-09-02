@@ -21,6 +21,7 @@ PlayersService="*uid://n07rgk7slbar"
 SteamNetwork="*uid://bwn8gn1cvx8bf"
 RunService="*uid://crrewascvtua1"
 PlayerIdentity="*uid://6b042t80rf0l"
+PlayerDataManager="*uid://6e6iujoq2xyl"
 
 [display]
 

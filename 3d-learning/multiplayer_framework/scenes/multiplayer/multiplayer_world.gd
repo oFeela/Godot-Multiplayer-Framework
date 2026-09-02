@@ -39,6 +39,14 @@ func _ready() -> void:
 	)
 		
 	# Additional logic as needed (e.g. data store, etc.)
+	if RunService.is_server():
+		while true:
+			await get_tree().create_timer(1).timeout
+			print(PlayerDataManager._profiles)
+			for p: Player in PlayersService.get_players():
+				var profile = PlayerDataManager._profiles[p]
+				profile.set_value("coins", profile.get_value("coins", 0) + 100)
+				print(p.name, profile.data)
 	
 	
 func _process(delta: float) -> void:

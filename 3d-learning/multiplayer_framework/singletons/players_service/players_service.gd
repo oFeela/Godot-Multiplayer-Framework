@@ -5,7 +5,6 @@ signal player_added(player: Player)
 signal player_removing(player: Player)
 signal server_shutting_down
 signal player_stat_changed(player: Player, stat_name: String, value: Variant)
-signal peer_authenticated(peer_id: int, player_id: String)
 
 ## VARIABLES
 var _players: Dictionary[int, Player] = {}
@@ -46,7 +45,6 @@ func setup_host_player() -> void:
 	_players[1] = host_player
 	local_player = host_player
 	
-	peer_authenticated.emit(1, PlayerIdentity.player_id)
 	player_added.emit(host_player)
 	
 	
@@ -72,7 +70,6 @@ func _rpc_client_ready_to_spawn(player_id: String) -> void:
 	_peer_to_player_id[incoming_peer_id] = player_id
 	print("[PlayersService] Mapped Peer %d -> Account '%s'" % [incoming_peer_id, player_id])
 	
-	peer_authenticated.emit(incoming_peer_id, player_id)
 	_register_and_sync_new_player(incoming_peer_id)
 	
 	
@@ -83,6 +80,9 @@ func get_player_id_from_peer_id(peer_id: int) -> String:
 	
 ## Helper to fetch player_id
 func get_player_id_from_player(player: Player) -> String:
+	if not player:
+		return ""
+		
 	return _peer_to_player_id.get(player.peer_id, "")
 	
 	
@@ -108,6 +108,9 @@ func get_local_character() -> Node:
 ## Server Only: Sets the Player character and then syncs across to clients
 func set_player_character(player: Player, char_node: Node) -> void:
 	if not RunService.is_server():
+		return
+		
+	if not player:
 		return
 	
 	_rpc_set_player_character.rpc(player.peer_id, char_node.get_path())	
@@ -147,6 +150,9 @@ func set_stat(player: Player, stat_name: String, value: Variant) -> void:
 		print_debug("Warning: Authoritative Server rule violation. Only the server can change stats!")
 		return
 		
+	if not player:
+		return
+		
 	_rpc_set_stat.rpc(player.peer_id, stat_name, value)
 	
 @rpc("authority", "call_local", "reliable")
@@ -159,6 +165,9 @@ func _rpc_set_stat(peer_id: int, stat_name: String, value: Variant) -> void:
 		
 ## Safely fetches a stat from a specific Player's stats.
 func get_stat(player: Player, stat_name: String, default: Variant = 0) -> Variant:
+	if not player:
+		return default
+	
 	var peer_id = player.peer_id
 	
 	if has_player(peer_id):
@@ -170,6 +179,9 @@ func get_stat(player: Player, stat_name: String, default: Variant = 0) -> Varian
 func kick_player(player: Player, reason: String = "Kicked from server!") -> void:
 	if not RunService.is_server():
 		print_debug("Warning: Only the server can kick!")
+		return
+		
+	if not player:
 		return
 		
 	var peer_id = player.peer_id
@@ -307,11 +319,14 @@ func _on_peer_disconnected(peer_id: int) -> void:
 		return
 		
 	# Broadcasts the removal to everyone (including server) FIRST
+	# so that 'player_removing' is emitted first and player_id can be used before clearance
 	_rpc_on_peer_disconnected.rpc(peer_id)
 	
 	# Only need to remove on server, because player_id is not replicated!
 	if _peer_to_player_id.has(peer_id):
 		_peer_to_player_id.erase(peer_id)
+		
+	print(_peer_to_player_id)
 		
 ## Client sync of a Player removal upon peer disconnection.
 @rpc("authority", "call_local", "reliable")
@@ -343,7 +358,9 @@ func _clear_service_data() -> void:
 	for peer_id in _players.keys():
 		# Cannot simply call _rpc_on_peer_disconnected 
 		# because this will be called locally
-		var dropping_player = _players[peer_id]
+		var dropping_player = _players.get(peer_id, null)
+		if not dropping_player: continue
+		
 		player_removing.emit(dropping_player)
 		
 		if dropping_player.character and is_instance_valid(dropping_player.character):
