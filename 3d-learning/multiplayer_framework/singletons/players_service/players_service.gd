@@ -3,7 +3,7 @@ extends Node2D
 ## CONSTANTS
 signal player_added(player: Player)
 signal player_removing(player: Player)
-signal server_shutdown
+signal server_shutting_down
 
 ## VARIABLES
 var _players: Dictionary[int, Player] = {}
@@ -46,8 +46,8 @@ func setup_host_player() -> void:
 ## Call this function when the host leaves to gracefully handle server shutdown.
 ## This is absolutely needed if a client can be the host.
 func clean_up_host_player() -> void:
+	server_shutting_down.emit()
 	_clear_service_data()
-	server_shutdown.emit()
 	
 	
 ## Client-to-Server: Notifies the host that this peer finished loading their map scene
@@ -292,8 +292,8 @@ func _rpc_on_peer_disconnected(peer_id: int) -> void:
 ## All peers will call this themselves. Server doesn't broadcast.
 ## Will automically be called once the server disconnects.
 func _on_server_disconnected() -> void:
+	server_shutting_down.emit()
 	_clear_service_data()
-	server_shutdown.emit()
 	
 ## Resets the service state/data.
 func _clear_service_data() -> void:

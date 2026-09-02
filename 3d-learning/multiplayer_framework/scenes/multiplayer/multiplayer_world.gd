@@ -44,7 +44,12 @@ func _ready() -> void:
 				print(player.character)
 	else:
 		# For testing client leaving
-		await get_tree().create_timer(3).timeout
+		PlayersService.server_shutting_down.connect(func():
+			print("Disconnected from server!")
+			get_tree().change_scene_to_file("res://multiplayer_framework/scenes/main/main.tscn")
+		)
+		
+		await get_tree().create_timer(10).timeout
 		multiplayer.multiplayer_peer.close()
 		get_tree().change_scene_to_file("res://multiplayer_framework/scenes/main/main.tscn")
 		
