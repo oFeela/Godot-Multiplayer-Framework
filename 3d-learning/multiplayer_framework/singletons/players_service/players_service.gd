@@ -23,8 +23,7 @@ func _ready():
 	
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if is_server():
-			clean_up_host_player()
+		leave_server()
 		get_tree().quit()
 	
 	
@@ -34,6 +33,9 @@ func _notification(what: int) -> void:
 ## Call this function to setup the host player for both single player and multiplayer.
 ## Most MultiplayerPeer implementation will have the server be the client who hosted.
 func setup_host_player() -> void:
+	if not is_server():
+		return
+		
 	var host_player = Player.new()
 	host_player.peer_id = 1
 	host_player.name = _get_player_name_from_steam(1)
@@ -42,13 +44,6 @@ func setup_host_player() -> void:
 	local_player = host_player
 	
 	player_added.emit(host_player)
-	
-	
-## Call this function when the host leaves to gracefully handle server shutdown.
-## This is absolutely needed if a client can be the host.
-func clean_up_host_player() -> void:
-	_on_peer_disconnected(1)
-	_clear_service_data()
 	
 	
 ## Client-to-Server: Notifies the host that this peer finished loading their map scene
@@ -169,13 +164,22 @@ func kick_player(player: Player, reason: String = "Kicked from server!") -> void
 	
 	# For server kick
 	if peer_id == 1 or peer_id == multiplayer.get_unique_id():
-		clean_up_host_player()
-		multiplayer.multiplayer_peer.close()
+		leave_server()
 		return
 		
 	if multiplayer.has_multiplayer_peer():
 		# This should trigger multiplayer.peer_disconnected signal
 		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
+		
+		
+## Call this function when a client/server voluntarily wants to leave the server.
+func leave_server() -> void:
+	server_shutting_down.emit()
+	_clear_service_data()
+	
+	if multiplayer.has_multiplayer_peer():
+		multiplayer.multiplayer_peer.close()
+		
 		
 		
 ## PRIVATES
@@ -303,12 +307,18 @@ func _rpc_on_peer_disconnected(peer_id: int) -> void:
 			dropping_player.character.queue_free()
 		
 		
-## Called when the server shutdowns/leaves.
-## All peers will call this themselves. Server doesn't broadcast.
-## Will automically be called once the server disconnects.
+## Will automically be called once the server disconnects
+## All clients will call this themselves. Server doesn't broadcast.
+## This is used for unexpected disconnect.
+## Since for graceful leave, it won't rely after 'multiplayer.multiplayer_peer' has been disconnected.
 func _on_server_disconnected() -> void:
+	# If service data is already cleared, ignore (host cleanup or double disconnect)
+	if _players.is_empty() and not local_player:
+		return
+		
 	server_shutting_down.emit()
 	_clear_service_data()
+	
 	
 ## Resets the service state/data.
 func _clear_service_data() -> void:

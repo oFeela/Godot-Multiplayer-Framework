@@ -7,12 +7,16 @@ extends Node3D # Or 2D
 @export var auto_spawn: bool = true
 @export var respawn_time: float = 3.0
 
+var server_is_shutting_down: bool = false
+
 @onready var player_characters_container = $PlayerCharactersContainer
 @onready var multiplayer_spawner = $MultiplayerSpawner
 
 ## OVERRIDEN METHODS
 func _ready() -> void:
 	multiplayer_spawner.spawn_path = player_characters_container.get_path()
+	if multiplayer_spawner.get_spawnable_scene_count() == 0:
+		multiplayer_spawner.add_spawnable_scene(player_character_scene.resource_path)
 	
 	# PlayersService connections
 	PlayersService.player_added.connect(_on_player_joined_server)
@@ -27,37 +31,16 @@ func _ready() -> void:
 	if not PlayersService.is_server():
 		PlayersService.notify_server_scene_ready()
 		
-	# For PlayersService testing
-	# For testing client leaving
+	# For the current client leaving, 'server_shutting_down' will be fired
 	PlayersService.server_shutting_down.connect(func():
 		print("Disconnected from server!")
-		get_tree().change_scene_to_file("res://multiplayer_framework/scenes/main/main.tscn")
+		server_is_shutting_down = true
+		get_tree().change_scene_to_file.call_deferred("res://multiplayer_framework/scenes/main/main.tscn")
 	)
-	if PlayersService.is_server():
-		while true:
-			if get_tree():
-				await get_tree().create_timer(1).timeout
-			else:
-				continue
-				
-			PlayersService.set_stat(
-				PlayersService.local_player, 
-				"Level",
-				PlayersService.get_stat(PlayersService.local_player, "Level")
-				+ 1
-			)
-			
-			for player in PlayersService.get_players():
-				print(player.name)
-				print(player.stats._data)
-				print(player.character)
-				await get_tree().create_timer(1).timeout
-				PlayersService.kick_player(player)
-	else:
-		await get_tree().create_timer(10).timeout
-		multiplayer.multiplayer_peer.close()
 		
-				
+	# Additional logic as needed (e.g. data store, etc.)
+	
+	
 func _process(delta: float) -> void:
 	pass
 	
@@ -72,7 +55,9 @@ func spawn_player_character(player: Player) -> void:
 		return
 		
 	if player.character and is_instance_valid(player.character):
-		player.character.queue_free()
+		var old_char = player.character
+		player.character = null
+		old_char.queue_free()
 		
 	var new_character := player_character_scene.instantiate()
 	new_character.name = str(player.peer_id)
@@ -96,7 +81,7 @@ func spawn_player_character(player: Player) -> void:
 	force_reposition(player, spawn_position)
 	
 	# For respawning
-	new_character.tree_exited.connect(_on_player_character_freed.bind(player))
+	new_character.tree_exited.connect(_on_player_character_freed.bind(player), CONNECT_ONE_SHOT)
 	
 	
 func force_reposition(player: Player, target_position: Variant) -> void:
@@ -122,12 +107,15 @@ func _rpc_force_reposition(target_position: Variant) -> void:
 ## Called when a Player's character is freed.
 ## Example is for respawn purposes.
 func _on_player_character_freed(player: Player):
-	if not player in PlayersService.get_players():
+	if server_is_shutting_down or not player in PlayersService.get_players():
 		return
 		
 	print("[Workspace] ", player.name, " avatar was freed. Initiating ", "%.1f" % respawn_time, "-second respawn...")
 	await get_tree().create_timer(respawn_time).timeout
 	
+	if server_is_shutting_down or not player in PlayersService.get_players():
+		return
+		
 	# Respawn them.
 	# They won't respawn if 'auto_spawn' is false already handled inside.
 	_on_player_joined_server(player)

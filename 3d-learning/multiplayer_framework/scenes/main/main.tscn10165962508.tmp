@@ -1,0 +1,31 @@
+[gd_scene format=3 uid="uid://cxy3auj6iey8l"]
+
+[ext_resource type="Script" uid="uid://bbh8bk3g1ic0h" path="res://multiplayer_framework/scenes/main/main.gd" id="1_2nyrq"]
+
+[node name="Main" type="Node2D" unique_id=1785666143]
+script = ExtResource("1_2nyrq")
+use_steam = false
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1642400429]
+
+[node name="HostButton" type="Button" parent="CanvasLayer" unique_id=510589079]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -51.0
+offset_bottom = 31.0
+grow_horizontal = 0
+text = "HOST"
+
+[node name="JoinButton" type="Button" parent="CanvasLayer" unique_id=641072366]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -51.0
+offset_top = -31.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "JOIN
+"
