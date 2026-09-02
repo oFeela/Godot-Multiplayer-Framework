@@ -28,9 +28,18 @@ func _ready() -> void:
 		PlayersService.notify_server_scene_ready()
 		
 	# For PlayersService testing
+	# For testing client leaving
+	PlayersService.server_shutting_down.connect(func():
+		print("Disconnected from server!")
+		get_tree().change_scene_to_file("res://multiplayer_framework/scenes/main/main.tscn")
+	)
 	if PlayersService.is_server():
 		while true:
-			await get_tree().create_timer(1).timeout
+			if get_tree():
+				await get_tree().create_timer(1).timeout
+			else:
+				continue
+				
 			PlayersService.set_stat(
 				PlayersService.local_player, 
 				"Level",
@@ -42,16 +51,11 @@ func _ready() -> void:
 				print(player.name)
 				print(player.stats._data)
 				print(player.character)
+				await get_tree().create_timer(1).timeout
+				PlayersService.kick_player(player)
 	else:
-		# For testing client leaving
-		PlayersService.server_shutting_down.connect(func():
-			print("Disconnected from server!")
-			get_tree().change_scene_to_file("res://multiplayer_framework/scenes/main/main.tscn")
-		)
-		
 		await get_tree().create_timer(10).timeout
 		multiplayer.multiplayer_peer.close()
-		get_tree().change_scene_to_file("res://multiplayer_framework/scenes/main/main.tscn")
 		
 				
 func _process(delta: float) -> void:

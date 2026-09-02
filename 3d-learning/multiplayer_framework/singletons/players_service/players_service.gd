@@ -4,6 +4,7 @@ extends Node2D
 signal player_added(player: Player)
 signal player_removing(player: Player)
 signal server_shutting_down
+signal player_stat_changed(player: Player, stat_name: String, value: Variant)
 
 ## VARIABLES
 var _players: Dictionary[int, Player] = {}
@@ -46,7 +47,7 @@ func setup_host_player() -> void:
 ## Call this function when the host leaves to gracefully handle server shutdown.
 ## This is absolutely needed if a client can be the host.
 func clean_up_host_player() -> void:
-	server_shutting_down.emit()
+	_on_peer_disconnected(1)
 	_clear_service_data()
 	
 	
@@ -63,7 +64,7 @@ func _rpc_client_ready_to_spawn() -> void:
 		
 	var incoming_peer_id = multiplayer.get_remote_sender_id()
 	
-	if _players.has(incoming_peer_id):
+	if has_player(incoming_peer_id):
 		print_debug("Warning: Security Exception. Peer ", incoming_peer_id, " attempted duplicate registration!")
 		return
 		
@@ -85,6 +86,11 @@ func get_player_from_character(char_node: Node) -> Player:
 	return null
 	
 	
+## Helper to get the local Player's character node directly
+func get_local_character() -> Node:
+	return local_player.character if local_player and is_instance_valid(local_player.character) else null
+	
+	
 ## Server Only: Sets the Player character and then syncs across to clients
 func set_player_character(player: Player, char_node: Node) -> void:
 	if not is_server():
@@ -94,7 +100,7 @@ func set_player_character(player: Player, char_node: Node) -> void:
 	
 @rpc("authority", "call_local", "reliable")
 func _rpc_set_player_character(peer_id: int, char_node_path: NodePath) -> void:
-	if not _players.has(peer_id):
+	if not has_player(peer_id):
 		return
 		
 	if has_node(char_node_path):
@@ -121,6 +127,11 @@ func is_server():
 	return multiplayer.is_server() if multiplayer.has_multiplayer_peer() else true
 	
 	
+## Helper to check if a peer ID is currently connected
+func has_player(peer_id: int) -> bool:
+	return _players.has(peer_id)
+	
+	
 ## Server-only: Updates a Player's stat and replicates it out to all clients.
 func set_stat(player: Player, stat_name: String, value: Variant) -> void:
 	if not is_server():
@@ -131,16 +142,17 @@ func set_stat(player: Player, stat_name: String, value: Variant) -> void:
 	
 @rpc("authority", "call_local", "reliable")
 func _rpc_set_stat(peer_id: int, stat_name: String, value: Variant) -> void:
-	if _players.has(peer_id):
+	if has_player(peer_id):
 		print("On peer ", multiplayer.get_unique_id(), " set peer ", peer_id, " stat of ", stat_name, " to ", value)
 		_players[peer_id].stats.set_value(stat_name, value)
+		player_stat_changed.emit(_players[peer_id], stat_name, value)
 		
 		
 ## Safely fetches a stat from a specific Player's stats.
 func get_stat(player: Player, stat_name: String, default: Variant = 0) -> Variant:
 	var peer_id = player.peer_id
 	
-	if _players.has(peer_id):
+	if has_player(peer_id):
 		return _players[peer_id].stats.get_value(stat_name, default)
 	return default
 	
@@ -151,12 +163,15 @@ func kick_player(player: Player, reason: String = "Kicked from server!") -> void
 		print_debug("Warning: Only the server can kick!")
 		return
 		
-	# No kicking self
 	var peer_id = player.peer_id
-	if peer_id == 1 or peer_id == multiplayer.get_unique_id():
-		return
 		
 	print("Kicking Peer ID: ", peer_id, " Reason: ", reason)
+	
+	# For server kick
+	if peer_id == 1 or peer_id == multiplayer.get_unique_id():
+		clean_up_host_player()
+		multiplayer.multiplayer_peer.close()
+		return
 		
 	if multiplayer.has_multiplayer_peer():
 		# This should trigger multiplayer.peer_disconnected signal
@@ -252,7 +267,7 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 func _rpc_on_peer_connected(peer_id: int, incoming_name: String) -> void:
 	# For the host, already registered ourselves and clients manually, 
 	# so we don't want to duplicate data.
-	if _players.has(peer_id):
+	if has_player(peer_id):
 		return
 		
 	var new_player = Player.new()
@@ -279,7 +294,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 ## Client sync of a Player removal upon peer disconnection.
 @rpc("authority", "call_local", "reliable")
 func _rpc_on_peer_disconnected(peer_id: int) -> void:
-	if _players.has(peer_id):
+	if has_player(peer_id):
 		var dropping_player = _players[peer_id]
 		player_removing.emit(dropping_player)
 		_players.erase(peer_id)
