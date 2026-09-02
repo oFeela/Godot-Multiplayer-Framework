@@ -28,7 +28,7 @@ func _ready() -> void:
 		
 	# For clients, only tell the server to join as Player
 	# if and only if the MultiplayerWorld scene has finished loading.
-	if not PlayersService.is_server():
+	if not RunService.is_server():
 		PlayersService.notify_server_scene_ready()
 		
 	# For the current client leaving, 'server_shutting_down' will be fired
@@ -51,7 +51,7 @@ func _process(delta: float) -> void:
 ## Spawns the character of the given Player.
 ## Will instead respawn if already exists.
 func spawn_player_character(player: Player) -> void:
-	if not PlayersService.is_server() or not auto_spawn:
+	if not RunService.is_server() or not auto_spawn:
 		return
 		
 	if player.character and is_instance_valid(player.character):
@@ -85,7 +85,7 @@ func spawn_player_character(player: Player) -> void:
 	
 	
 func force_reposition(player: Player, target_position: Variant) -> void:
-	if not PlayersService.is_server():
+	if not RunService.is_server():
 		return
 	
 	_rpc_force_reposition.rpc_id(player.peer_id, target_position)
@@ -137,7 +137,7 @@ func _find_spawn_points(curr_node: Node) -> Array[PlayerCharacterSpawnPoint]:
 	
 ## Server-Authoritative instantiation loop
 func _on_player_joined_server(player: Player) -> void:
-	if not PlayersService.is_server() or not auto_spawn:
+	if not RunService.is_server() or not auto_spawn:
 		return
 		
 	spawn_player_character(player)

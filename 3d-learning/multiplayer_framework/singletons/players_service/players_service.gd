@@ -5,9 +5,11 @@ signal player_added(player: Player)
 signal player_removing(player: Player)
 signal server_shutting_down
 signal player_stat_changed(player: Player, stat_name: String, value: Variant)
+signal peer_authenticated(peer_id: int, player_id: String)
 
 ## VARIABLES
 var _players: Dictionary[int, Player] = {}
+var _peer_to_player_id: Dictionary[int, String] = {}
 var local_player: Player = null
 
 ## BUILT-IN METHODS
@@ -30,31 +32,34 @@ func _notification(what: int) -> void:
 	
 ## PUBLICS
 
-## Call this function to setup the host player for both single player and multiplayer.
-## Most MultiplayerPeer implementation will have the server be the client who hosted.
+## Setup Host Player (Server / Singleplayer Host)
 func setup_host_player() -> void:
-	if not is_server():
+	if not RunService.is_server():
 		return
 		
 	var host_player = Player.new()
 	host_player.peer_id = 1
 	host_player.name = _get_player_name_from_steam(1)
 	
+	# Register host identity locally
+	_peer_to_player_id[1] = PlayerIdentity.player_id
 	_players[1] = host_player
 	local_player = host_player
 	
+	peer_authenticated.emit(1, PlayerIdentity.player_id)
 	player_added.emit(host_player)
 	
 	
-## Client-to-Server: Notifies the host that this peer finished loading their map scene
+## Sends player_id and signals readiness in ONE atomic RPC
 func notify_server_scene_ready() -> void:
-	if is_server(): 
+	if RunService.is_server(): 
 		return
-	_rpc_client_ready_to_spawn.rpc_id(1)
+	_rpc_client_ready_to_spawn.rpc_id(1, PlayerIdentity.player_id)
+	
 	
 @rpc("any_peer", "call_remote", "reliable")
-func _rpc_client_ready_to_spawn() -> void:
-	if not is_server(): 
+func _rpc_client_ready_to_spawn(player_id: String) -> void:
+	if not RunService.is_server(): 
 		return
 		
 	var incoming_peer_id = multiplayer.get_remote_sender_id()
@@ -63,8 +68,22 @@ func _rpc_client_ready_to_spawn() -> void:
 		print_debug("Warning: Security Exception. Peer ", incoming_peer_id, " attempted duplicate registration!")
 		return
 		
-	print("[PlayersService] Peer ", incoming_peer_id, " map loaded successfully. Registering the player now.")
+	# Store server-only mapping
+	_peer_to_player_id[incoming_peer_id] = player_id
+	print("[PlayersService] Mapped Peer %d -> Account '%s'" % [incoming_peer_id, player_id])
+	
+	peer_authenticated.emit(incoming_peer_id, player_id)
 	_register_and_sync_new_player(incoming_peer_id)
+	
+	
+## Helper to fetch player_id from peer_id
+func get_player_id_from_peer_id(peer_id: int) -> String:
+	return _peer_to_player_id.get(peer_id, "") # Defaults to empty string for client who attempted
+	
+	
+## Helper to fetch player_id
+func get_player_id_from_player(player: Player) -> String:
+	return _peer_to_player_id.get(player.peer_id, "")
 	
 	
 ## Gets all connected players
@@ -88,7 +107,7 @@ func get_local_character() -> Node:
 	
 ## Server Only: Sets the Player character and then syncs across to clients
 func set_player_character(player: Player, char_node: Node) -> void:
-	if not is_server():
+	if not RunService.is_server():
 		return
 	
 	_rpc_set_player_character.rpc(player.peer_id, char_node.get_path())	
@@ -117,11 +136,6 @@ func get_player_from_peer_id(peer_id: int) -> Player:
 	return _players.get(peer_id, null)
 	
 	
-## Checks whether the current running peer is the server.
-func is_server():
-	return multiplayer.is_server() if multiplayer.has_multiplayer_peer() else true
-	
-	
 ## Helper to check if a peer ID is currently connected
 func has_player(peer_id: int) -> bool:
 	return _players.has(peer_id)
@@ -129,7 +143,7 @@ func has_player(peer_id: int) -> bool:
 	
 ## Server-only: Updates a Player's stat and replicates it out to all clients.
 func set_stat(player: Player, stat_name: String, value: Variant) -> void:
-	if not is_server():
+	if not RunService.is_server():
 		print_debug("Warning: Authoritative Server rule violation. Only the server can change stats!")
 		return
 		
@@ -154,7 +168,7 @@ func get_stat(player: Player, stat_name: String, default: Variant = 0) -> Varian
 	
 ## Server-only: Forcefully disconnects a player from the game session.
 func kick_player(player: Player, reason: String = "Kicked from server!") -> void:
-	if not is_server():
+	if not RunService.is_server():
 		print_debug("Warning: Only the server can kick!")
 		return
 		
@@ -207,14 +221,14 @@ func _get_player_name_from_steam(peer_id: int) -> String:
 	
 ## Server-side handling upon peer connection.
 func _on_peer_connected(peer_id: int) -> void:
-	if not is_server():
+	if not RunService.is_server():
 		return
 	print("[PlayersService] Raw peer socket opened for: ", peer_id, ". Waiting for scene handshake...")
 	
 	
 ## Server-side handling of Player creation upon peer connection.
 func _register_and_sync_new_player(peer_id: int) -> void:
-	if not is_server():
+	if not RunService.is_server():
 		return
 		
 	# Create the new peer's Player on the server
@@ -289,11 +303,15 @@ func _rpc_on_peer_connected(peer_id: int, incoming_name: String) -> void:
 	
 ## Server-side handling of Player destruction upon peer disconnection.
 func _on_peer_disconnected(peer_id: int) -> void:
-	if not is_server():
+	if not RunService.is_server():
 		return
 		
-	# Broadcasts the removal to everyone (including server)
+	# Broadcasts the removal to everyone (including server) FIRST
 	_rpc_on_peer_disconnected.rpc(peer_id)
+	
+	# Only need to remove on server, because player_id is not replicated!
+	if _peer_to_player_id.has(peer_id):
+		_peer_to_player_id.erase(peer_id)
 		
 ## Client sync of a Player removal upon peer disconnection.
 @rpc("authority", "call_local", "reliable")
@@ -332,4 +350,5 @@ func _clear_service_data() -> void:
 			dropping_player.character.queue_free()
 		
 	_players.clear()
+	_peer_to_player_id.clear()
 	local_player = null
