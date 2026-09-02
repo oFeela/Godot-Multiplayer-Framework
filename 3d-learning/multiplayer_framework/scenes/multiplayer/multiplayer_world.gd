@@ -42,7 +42,12 @@ func _ready() -> void:
 				print(player.name)
 				print(player.stats._data)
 				print(player.character)
-				
+	else:
+		# For testing client leaving
+		await get_tree().create_timer(3).timeout
+		multiplayer.multiplayer_peer.close()
+		get_tree().change_scene_to_file("res://multiplayer_framework/scenes/main/main.tscn")
+		
 				
 func _process(delta: float) -> void:
 	pass
