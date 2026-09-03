@@ -32,13 +32,14 @@ func _ready() -> void:
 		PlayersService.notify_server_scene_ready()
 		
 	# For the current client leaving, 'server_shutting_down' will be fired
-	## TODO: FIX SO THAT FOR SCENE CHANGE TO MAIN MENU, DONT USE SERVER_SHUTTING_DOWN
-	## SINCE IT IS EMITTED BEFORE PEER ACTUALYL DISOONNECTED
-	## IT WIL CAUSE MUTLIPLAYERSYNCHRONIZER TO THROW ERRORS
 	PlayersService.server_shutting_down.connect(func():
 		print("Disconnected from server!")
 		server_is_shutting_down = true
-		#get_tree().change_scene_to_file.call_deferred("res://multiplayer_framework/scenes/main/main.tscn")
+	)
+	
+	# Change back to main menu
+	multiplayer.server_disconnected.connect(func():
+		get_tree().change_scene_to_file.call_deferred("res://multiplayer_framework/scenes/main/main.tscn")
 	)
 		
 	# Additional logic as needed (e.g. data store, etc.)
