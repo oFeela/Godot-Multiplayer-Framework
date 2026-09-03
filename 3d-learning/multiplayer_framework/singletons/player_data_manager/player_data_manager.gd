@@ -52,15 +52,20 @@ func _on_player_added(player: Player):
 	else:
 		if player_data_store.store_mode == DataProfileStore.StoreMode.P2P:
 			# Wait for arrival
-			var cb: Callable
-			cb = func(key: String):
+			var wrapper: Array[Callable] = []
+
+			wrapper.append(func(key: String):
 				if key == player_id:
 					var loaded_profile = player_data_store.get_profile(key)
 					if loaded_profile:
 						_on_profile_ready(player, loaded_profile)
-					player_data_store.client_payload_received.disconnect(cb)
-					
-			player_data_store.client_payload_received.connect(cb)
+						
+					# Properly disconnects because wrapper[0] evaluates to the actual Callable
+					if player_data_store.client_payload_received.is_connected(wrapper[0]):
+						player_data_store.client_payload_received.disconnect(wrapper[0])
+			)
+
+			player_data_store.client_payload_received.connect(wrapper[0])
 		else:
 			PlayersService.kick_player(player, "Data failed to load. Please rejoin!")
 		

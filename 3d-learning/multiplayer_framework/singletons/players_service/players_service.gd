@@ -194,7 +194,7 @@ func kick_player(player: Player, reason: String = "Kicked from server!") -> void
 		
 	if multiplayer.has_multiplayer_peer():
 		_remove_player_internal(peer_id)
-		await get_tree().create_timer(0.05).timeout
+		await get_tree().create_timer(0.5).timeout
 		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
 		
 		
@@ -205,7 +205,7 @@ func leave_server() -> void:
 			_rpc_notify_server_shutting_down.rpc()
 			
 			# Yield to give network buffer time to flush save RPCs to clients
-			await get_tree().create_timer(0.2).timeout
+			await get_tree().create_timer(1.0).timeout
 		else:
 			server_shutting_down.emit()
 			
@@ -227,7 +227,7 @@ func _rpc_request_graceful_leave() -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if has_player(sender_id):
 		_remove_player_internal(sender_id)
-		await get_tree().create_timer(0.1).timeout
+		await get_tree().create_timer(0.5).timeout
 		
 	_rpc_acknowledge_leave.rpc_id(sender_id)
 	
@@ -240,6 +240,9 @@ func _rpc_acknowledge_leave() -> void:
 		
 @rpc("authority", "call_local", "reliable")
 func _rpc_notify_server_shutting_down() -> void:
+	if _players.is_empty() and _peer_to_player_id.is_empty() and not local_player:
+		return
+		
 	server_shutting_down.emit()
 	_clear_service_data()
 		
@@ -386,7 +389,7 @@ func _remove_player_internal(peer_id: int) -> void:
 ## Since for graceful leave, it won't rely after 'multiplayer.multiplayer_peer' has been disconnected.
 func _on_server_disconnected() -> void:
 	# If service data is already cleared, ignore (host cleanup or double disconnect)
-	if _players.is_empty() and not local_player:
+	if _players.is_empty() and _peer_to_player_id.is_empty() and not local_player:
 		return
 		
 	server_shutting_down.emit()
