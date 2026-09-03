@@ -200,15 +200,15 @@ func kick_player(player: Player, reason: String = "Kicked from server!") -> void
 		
 ## Call this function when a client/server voluntarily wants to leave the server.
 func leave_server() -> void:
-	server_shutting_down.emit()
-	
 	if multiplayer.has_multiplayer_peer():
 		if RunService.is_server():
-			_clear_service_data()
+			_rpc_notify_server_shutting_down.rpc()
 			
 			# Yield to give network buffer time to flush save RPCs to clients
 			await get_tree().create_timer(0.2).timeout
 		else:
+			server_shutting_down.emit()
+			
 			# Ask server to process player_removing over open socket
 			_rpc_request_graceful_leave.rpc_id(1)
 			
@@ -238,6 +238,10 @@ func _rpc_acknowledge_leave() -> void:
 	if multiplayer.has_multiplayer_peer():
 		multiplayer.multiplayer_peer.close()
 		
+@rpc("authority", "call_local", "reliable")
+func _rpc_notify_server_shutting_down() -> void:
+	server_shutting_down.emit()
+	_clear_service_data()
 		
 		
 ## PRIVATES
@@ -309,10 +313,10 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 	
 	_players[peer_id] = new_player
 	
-	# Broadcast to EVERYONE about the addition of the new Player
+	# Broadcast to EVERYONE (other than server since 'call_remote') about the addition
 	_rpc_on_peer_connected.rpc(peer_id, new_player.name)
 	
-	# Broadcast the newcomer's stats out to everyone else!
+	# Broadcast the newcomer's stats out to everyone else
 	for stat_name in new_player.stats._data.keys():
 		var stat_val = new_player.stats.get_value(stat_name)
 		_rpc_set_stat.rpc(peer_id, stat_name, stat_val)
@@ -321,13 +325,8 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 	
 	
 ## Client sync of a new Player upon peer connection.
-@rpc("authority", "call_local", "reliable")
-func _rpc_on_peer_connected(peer_id: int, incoming_name: String) -> void:
-	# For the host, already registered ourselves and clients manually, 
-	# so we don't want to duplicate data.
-	if has_player(peer_id):
-		return
-		
+@rpc("authority", "call_remote", "reliable")
+func _rpc_on_peer_connected(peer_id: int, incoming_name: String) -> void:		
 	var new_player = Player.new()
 	new_player.peer_id = peer_id
 	new_player.name = incoming_name
@@ -356,6 +355,7 @@ func _rpc_on_peer_disconnected(peer_id: int) -> void:
 		var dropping_player = _players[peer_id]
 		player_removing.emit(dropping_player)
 		_players.erase(peer_id)
+		_peer_to_player_id.erase(peer_id)
 		
 		if dropping_player.character and is_instance_valid(dropping_player.character):
 			dropping_player.character.queue_free()

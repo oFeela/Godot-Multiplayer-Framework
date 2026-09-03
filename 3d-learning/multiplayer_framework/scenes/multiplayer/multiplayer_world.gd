@@ -49,6 +49,7 @@ func _ready() -> void:
 				
 				profile.set_value("coins", profile.get_value("coins", 0) + 100)
 				print(p.name, profile.data)
+		pass
 	
 	
 func _process(delta: float) -> void:
