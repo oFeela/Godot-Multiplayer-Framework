@@ -14,6 +14,7 @@ var tags: Dictionary
 
 var is_replicated_globally := false
 var subscribed_peer_ids: Array[int] = []
+var _path_listeners: Array[Dictionary] = []
 
 ## OVERRIDEN METHODS
 func _init(r_name: String, r_data: Dictionary, r_tags: Dictionary = {}) -> void:
@@ -24,6 +25,22 @@ func _init(r_name: String, r_data: Dictionary, r_tags: Dictionary = {}) -> void:
 	
 	
 ## PUBLICS
+
+## Listen specifically to changes at a given path.
+## Example: profile.listen_to_change(["coins"], _on_coins_changed)
+func listen_to_change(path: Array, callback: Callable) -> void:
+	_path_listeners.append({
+		"path": path,
+		"callable": callback
+	})
+	
+	
+## Stop listening to changes at a specific path for a callback.
+func unlisten_change(path: Array, callback: Callable) -> void:
+	for i in range(_path_listeners.size() - 1, -1, -1):
+		var binding = _path_listeners[i]
+		if binding["path"] == path and binding["callable"] == callback:
+			_path_listeners.remove_at(i)
 
 ## Replicate state to ALL connected players and any player joining in the future.
 func replicate() -> void:
@@ -70,7 +87,9 @@ func set_data(path: Array, value: Variant) -> void:
 	_set_nested(data, path, value)
 	
 	LoggerService.info("[DataReplica] ['%s'] set_data: %s = %s (was: %s)" % [name, str(path), str(value), str(old_val)])
+	
 	data_set.emit(path, value, old_val)
+	_dispatch_listeners(path, value, old_val)
 	
 	if RunService.is_server():
 		DataReplicaService._send_mutation(self, "set_data", [path, value])
@@ -99,7 +118,9 @@ func array_insert(path: Array, value: Variant, index: int = -1) -> void:
 	arr.insert(index, value)
 	
 	LoggerService.info("[DataReplica] ['%s'] array_insert: inserted %s into %s at index %d" % [name, str(value), str(path), index])
+	
 	array_inserted.emit(path, value, index)
+	_dispatch_listeners(path, arr, index)
 	
 	if RunService.is_server():
 		DataReplicaService._send_mutation(self, "array_insert", [path, value, index])
@@ -120,7 +141,9 @@ func array_remove(path: Array, index: int) -> Variant:
 	arr.remove_at(index)
 	
 	LoggerService.info("[DataReplica] ['%s'] array_remove: removed %s from %s at index %d" % [name, str(removed_val), str(path), index])
+	
 	array_removed.emit(path, removed_val, index)
+	_dispatch_listeners(path, arr, index)
 	
 	if RunService.is_server():
 		DataReplicaService._send_mutation(self, "array_remove", [path, index])
@@ -159,3 +182,24 @@ func _set_nested(dict: Dictionary, path: Array, value: Variant) -> void:
 		curr = curr[k]
 		
 	curr[path[-1]] = value
+	
+	
+func _dispatch_listeners(changed_path: Array, new_value: Variant, secondary_arg: Variant) -> void:
+	for binding in _path_listeners:
+		var listener_path: Array = binding["path"]
+		
+		# Match exact path or parent container path
+		if listener_path == changed_path or _is_subpath(changed_path, listener_path):
+			var cb: Callable = binding["callable"]
+			if cb.is_valid():
+				# If watching a parent path, evaluate the value at the listener's exact path
+				var target_value = new_value if listener_path == changed_path else _get_nested(data, listener_path)
+				cb.call(target_value, secondary_arg)
+				
+				
+func _is_subpath(full_path: Array, parent_path: Array) -> bool:
+	if parent_path.size() > full_path.size(): return false
+	for i in range(parent_path.size()):
+		if parent_path[i] != full_path[i]:
+			return false
+	return true

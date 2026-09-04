@@ -14,6 +14,7 @@ var data: Dictionary = {}
 var is_active := true # active <==> session locked
 var _is_dirty := false
 var _template := {}
+var _path_listeners: Array[Dictionary] = []
 
 ## OVERRIDEN METHODS
 func _init(p_store_name: String, p_key: String, initial_data: Dictionary, template: Dictionary) -> void:
@@ -27,6 +28,23 @@ func _init(p_store_name: String, p_key: String, initial_data: Dictionary, templa
 	
 ## PUBLICS
 
+## Listen specifically to changes at a given path.
+## Example: profile.listen_to_change(["coins"], _on_coins_changed)
+func listen_to_change(path: Array, callback: Callable) -> void:
+	_path_listeners.append({
+		"path": path,
+		"callable": callback
+	})
+	
+	
+## Stop listening to changes at a specific path for a callback.
+func unlisten_change(path: Array, callback: Callable) -> void:
+	for i in range(_path_listeners.size() - 1, -1, -1):
+		var binding = _path_listeners[i]
+		if binding["path"] == path and binding["callable"] == callback:
+			_path_listeners.remove_at(i)
+			
+			
 ## Ensures new key additions in template default automatically populate existing save profiles
 func reconcile() -> void:
 	_reconcile_dict(data, _template)
@@ -46,7 +64,9 @@ func set_data(path: Array, value: Variant) -> void:
 	var old_val = _get_nested(data, path)
 	_set_nested(data, path, value)
 	_is_dirty = true
+	
 	data_set.emit(path, value, old_val)
+	_dispatch_listeners(path, value, old_val)
 		
 		
 ## Batch set multiple keys: replica.set_dict(["Stats"], {"Health": 100, "Mana": 50}).
@@ -73,7 +93,9 @@ func array_insert(path: Array, value: Variant, index: int = -1) -> void:
 		
 	arr.insert(index, value)
 	_is_dirty = true
+	
 	array_inserted.emit(path, value, index)
+	_dispatch_listeners(path, arr, index)
 	
 	
 ## Remove an item from an array by index: replica.array_remove(["Inventory"], 0).
@@ -90,7 +112,9 @@ func array_remove(path: Array, index: int) -> Variant:
 	var removed_val = arr[index]
 	arr.remove_at(index)
 	_is_dirty = true
+	
 	array_removed.emit(path, removed_val, index)
+	_dispatch_listeners(path, arr, index)
 	
 	return removed_val
 		
@@ -164,3 +188,24 @@ func _set_nested(dict: Dictionary, path: Array, value: Variant) -> void:
 		curr = curr[k]
 		
 	curr[path[-1]] = value
+	
+	
+func _dispatch_listeners(changed_path: Array, new_value: Variant, secondary_arg: Variant) -> void:
+	for binding in _path_listeners:
+		var listener_path: Array = binding["path"]
+		
+		# Match exact path or parent container path
+		if listener_path == changed_path or _is_subpath(changed_path, listener_path):
+			var cb: Callable = binding["callable"]
+			if cb.is_valid():
+				# If watching a parent path, evaluate the value at the listener's exact path
+				var target_value = new_value if listener_path == changed_path else _get_nested(data, listener_path)
+				cb.call(target_value, secondary_arg)
+				
+				
+func _is_subpath(full_path: Array, parent_path: Array) -> bool:
+	if parent_path.size() > full_path.size(): return false
+	for i in range(parent_path.size()):
+		if parent_path[i] != full_path[i]:
+			return false
+	return true
