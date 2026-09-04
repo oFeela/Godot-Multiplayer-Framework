@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" uid="uid://cjlkd1lcnfu0e" path="res://multiplayer_framework/scenes/multiplayer_world/multiplayer_world.gd" id="1_cgmwa"]
 [ext_resource type="Script" uid="uid://xqpi4yltss47" path="res://multiplayer_framework/objects/player_character_spawn_points/player_character_spawn_point.gd" id="2_a2ipg"]
+[ext_resource type="PackedScene" uid="uid://bedgmm6rp1ysk" path="res://game/objects/coins_giver/coins_giver.tscn" id="2_h7dri"]
+[ext_resource type="PackedScene" uid="uid://kgjs2codaqjx" path="res://game/scenes/hud/hud.tscn" id="4_h7dri"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_uh3ls"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -20,6 +22,8 @@ albedo_color = Color(1, 0.40784314, 1, 1)
 
 [node name="MultiplayerWorld" type="Node3D" unique_id=47932602]
 script = ExtResource("1_cgmwa")
+
+[node name="CoinsGiver" parent="." unique_id=2039425225 instance=ExtResource("2_h7dri")]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=47656638]
 environment = SubResource("Environment_llnyn")
@@ -125,3 +129,5 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 1
 material_override = SubResource("StandardMaterial3D_uh3ls")
 use_collision = true
 size = Vector3(20, 1, 20)
+
+[node name="HUD" parent="." unique_id=1448384445 instance=ExtResource("4_h7dri")]

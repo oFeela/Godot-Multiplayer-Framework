@@ -8,7 +8,7 @@ extends Node
 enum MultiplayerMode {P2P, CENTRALIZED}
 enum LogLevel {DEBUG, INFO, WARN, ERROR, NONE}
 
-const LOG_LEVEL := LogLevel.INFO
+const LOG_LEVEL := LogLevel.WARN
 
 const HMAC_SECRET_KEY := "67Miguel67_Change_In_Production_Ok"
 const MULTIPLAYER_MODE := MultiplayerMode.P2P

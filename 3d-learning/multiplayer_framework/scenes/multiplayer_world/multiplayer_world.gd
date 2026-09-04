@@ -32,28 +32,10 @@ func _ready() -> void:
 		server_is_shutting_down = true
 	)
 	
-	# Change back to main menu
+	# Change back to main menu after disconnected
 	multiplayer.server_disconnected.connect(func():
 		get_tree().change_scene_to_file.call_deferred(FrameworkConfig.MAIN_MENU_PATH)
 	)
-		
-	# Additional logic as needed (e.g. data store, etc.)
-	if RunService.is_server():
-		while true:
-			await get_tree().create_timer(1).timeout
-			LoggerService.debug(PlayerDataManager._profiles)
-			for p: Player in PlayersService.get_players():
-				var profile = PlayerDataManager._profiles.get(p, null)
-				if not profile: continue
-				
-				profile.set_value("coins", profile.get_value("coins", 0) + 100)
-				LoggerService.debug(p.name)
-				LoggerService.debug(profile.data)
-		pass
-	
-	
-func _process(delta: float) -> void:
-	pass
 	
 	
 	

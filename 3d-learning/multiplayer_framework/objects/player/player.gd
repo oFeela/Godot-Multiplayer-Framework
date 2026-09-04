@@ -22,3 +22,8 @@ var character: Node = null :
 		character = new_char
 		if character: # Ensure non-null assignment
 			character_added.emit(character)
+
+## OVERRIDEN METHODS
+func _init(p_peer_id: int, p_name: String) -> void:
+	peer_id = p_peer_id
+	name = p_name

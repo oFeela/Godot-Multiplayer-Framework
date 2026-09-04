@@ -1,5 +1,7 @@
 extends Node2D
 
+## Players player_id is not accessible by clients!
+
 ## CONSTANTS
 signal player_added(player: Player)
 signal player_removing(player: Player)
@@ -36,9 +38,10 @@ func setup_host_player() -> void:
 	if not RunService.is_server():
 		return
 		
-	var host_player = Player.new()
-	host_player.peer_id = 1
-	host_player.name = _get_player_name_from_steam(1)
+	var host_player = Player.new(
+		1,
+		_get_player_name_from_steam(1)
+	)
 	
 	# Register host identity locally
 	_peer_to_player_id[1] = PlayerIdentity.player_id
@@ -281,9 +284,10 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 		return
 		
 	# Create the new peer's Player on the server
-	var new_player = Player.new()
-	new_player.peer_id = peer_id
-	new_player.name = _get_player_name_from_steam(peer_id)
+	var new_player = Player.new(
+		peer_id,
+		_get_player_name_from_steam(peer_id)
+	)
 	
 	# Sync existing Players to the newly connected peer
 	for existing_peer_id in _players.keys():
@@ -328,9 +332,10 @@ func _register_and_sync_new_player(peer_id: int) -> void:
 ## Client sync of a new Player upon peer connection.
 @rpc("authority", "call_remote", "reliable")
 func _rpc_on_peer_connected(peer_id: int, incoming_name: String) -> void:		
-	var new_player = Player.new()
-	new_player.peer_id = peer_id
-	new_player.name = incoming_name
+	var new_player = Player.new(
+		peer_id,
+		incoming_name
+	)
 	
 	_players[peer_id] = new_player
 	
