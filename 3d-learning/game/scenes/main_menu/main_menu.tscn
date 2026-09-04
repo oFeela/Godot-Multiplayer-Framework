@@ -4,7 +4,7 @@
 
 [node name="Main" type="Node2D" unique_id=1785666143]
 script = ExtResource("1_2nyrq")
-use_steam = false
+use_steam = true
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1642400429]
 

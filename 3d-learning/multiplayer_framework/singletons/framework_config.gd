@@ -12,6 +12,9 @@ const LOG_LEVEL := LogLevel.INFO
 
 const HMAC_SECRET_KEY := "67Miguel67_Change_In_Production_Ok"
 const MULTIPLAYER_MODE := MultiplayerMode.P2P
+const DEFAULT_PORT := 4242
+const DEFAULT_MAX_PLAYERS := 4
+const DEFAULT_USE_STEAM := false
 
 const MULTIPLAYER_WORLD_PATH := "uid://e5owhf6b1sn7"
 const MAIN_MENU_PATH := "uid://cxy3auj6iey8l"
