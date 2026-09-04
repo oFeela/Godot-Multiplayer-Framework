@@ -117,17 +117,6 @@ func set_profile_value(profile: DataProfile, data_key: String, value: Variant) -
 		
 	profile.set_value(data_key, value)
 	
-	if store_mode == StoreMode.P2P and _key_to_peer_id.has(profile.key):
-		var target_peer_id = _key_to_peer_id[profile.key]
-		
-		# Sync the change to the client ONLY (server is instantaneous)
-		if target_peer_id != 1 and target_peer_id != multiplayer.get_unique_id():
-			_rpc_sync_client_profile_value.rpc_id(target_peer_id, profile.key, data_key, value)
-			
-@rpc("authority", "call_remote", "reliable")
-func _rpc_sync_client_profile_value(key: String, data_key: String, value: Variant) -> void:
-	print("[DataProfileStore] Synced profile %s's data key '%s' -> %s" % [key, data_key, str(value)])
-	
 	
 ## Saves the given profile if it's dirty
 func save_profile(profile: DataProfile) -> void:

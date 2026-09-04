@@ -2,16 +2,12 @@ extends Node
 
 ## This is the script to customize for what data needs to be saved.
 ## It uses the DataProfielStore and DataProfile abstraction.
+## THIS IS SERVER ONLY. ONLY SERVER WILL CREATE PROFILES. 
+## CLIENTS WILL HAVE TO REQUEST FOR THEM MANUALLY IN SOME WAY.
 
 ## CONSTANTS
-const player_data_store_name := "PlayerData_1"
-const data_store_mode := DataProfileStore.StoreMode.P2P
-
-## VARIABLES
-var player_data_store: DataProfileStore
-var _profiles: Dictionary[Player, DataProfile] = {}
-
-## TEMPLATES
+const PLAYER_DATA_STORE_NAME := "PlayerData_1"
+const DATA_STORE_MODE := DataProfileStore.StoreMode.P2P
 const PLAYER_TEMPLATE := {
 	"coins": 100,
 	"gems": 10,
@@ -20,12 +16,16 @@ const PLAYER_TEMPLATE := {
 	"ascension": 0,
 }
 
+## VARIABLES
+var player_data_store: DataProfileStore
+var _profiles: Dictionary[Player, DataProfile] = {}
+
 ## OVERRIDEN METHODS
 func _ready() -> void:
 	player_data_store = DataProfileStore.new(
-		player_data_store_name,
+		PLAYER_DATA_STORE_NAME,
 		PLAYER_TEMPLATE,
-		data_store_mode
+		DATA_STORE_MODE
 	)
 	add_child(player_data_store)
 	
@@ -72,11 +72,8 @@ func _on_player_added(player: Player):
 		
 func _on_profile_ready(player: Player, profile: DataProfile) -> void:
 	profile.unlocked.connect(func():
-		_profiles.erase(player)
-		#PlayersService.kick_player(
-			#player,
-			#"Main data profile session ended. Should not still be in the server."
-		#)
+		_profiles.erase(player),
+		CONNECT_ONE_SHOT
 	)
 	
 	# Just in case they did not disconnect
@@ -85,7 +82,7 @@ func _on_profile_ready(player: Player, profile: DataProfile) -> void:
 		print("[PlayerDataManager] Profile loaded for %s!" % player.name)
 		
 		# Usage exmaple
-		profile.data["coins"] += 100 # Direct but won't trigger signal
+		profile.data["coins"] += 100 # Direct but won't trigger signal/flag, TLDR: NEVER USE THIS
 		profile.set_value("coins", profile.get_value("coins", 0) + 100) # Will trigger signal 'value_changed'
 	else:
 		player_data_store.unload_profile(profile)
