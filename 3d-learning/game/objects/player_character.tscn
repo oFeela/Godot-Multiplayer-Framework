@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bg4uh6g3e6swi"]
 
-[ext_resource type="Script" uid="uid://dti34ht52gklj" path="res://multiplayer_framework/scenes/multiplayer/player_character.gd" id="1_5upib"]
+[ext_resource type="Script" uid="uid://dti34ht52gklj" path="res://game/objects/player_character.gd" id="1_5upib"]
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_c28q2"]
 properties/0/path = NodePath(".:position")

@@ -10,7 +10,6 @@ extends Node2D
 ## It is the scene that allows the player to create/join a lobby
 
 ## CONSTANTS
-const MULTIPLAYER_WORLD: PackedScene = preload("uid://e5owhf6b1sn7")
 const DEFAULT_PORT: int = 4242
 const MAX_PLAYERS: int = 4
 
@@ -36,14 +35,14 @@ func _ready() -> void:
 ## Connected to HostButton pressed signal
 func _on_host_button_pressed() -> void:
 	if use_steam:
-		print("[Main] Requesting Steam Lobby Creation...")
+		LoggerService.info("[Main] Requesting Steam Lobby Creation...")
 		SteamNetwork.create_lobby()
 	else:
-		print("[Main] Initializing Local ENet Test Host on port: ", DEFAULT_PORT)
+		LoggerService.info("[Main] Initializing Local ENet Test Host on port: " + str(DEFAULT_PORT))
 		var peer = ENetMultiplayerPeer.new()
 		var error = peer.create_server(DEFAULT_PORT, MAX_PLAYERS)
 		if error != OK:
-			print("[Main] Failed to create ENet Host socket: ", error)
+			LoggerService.warn("[Main] Failed to create ENet Host socket: " + str(error))
 			return
 			
 		multiplayer.multiplayer_peer = peer
@@ -56,19 +55,19 @@ func _on_host_button_pressed() -> void:
 ## Connected to your UI "Join" button pressed signal (Strictly needed for local ENet testing!)
 func _on_join_button_pressed() -> void:
 	if use_steam:
-		print("[Main] For Steam, please accept a friend invite via the overlay.")
+		LoggerService.warn("[Main] For Steam, please accept a friend invite via the overlay.")
 		return
 		
-	print("[Main] Connecting to Local ENet Test Host at 127.0.0.1...")
+	LoggerService.info("[Main] Connecting to Local ENet Test Host at 127.0.0.1...")
 	var peer = ENetMultiplayerPeer.new()
 	var error = peer.create_client("127.0.0.1", DEFAULT_PORT)
 	if error != OK:
-		print("[Main] Failed to create ENet client socket: ", error)
+		LoggerService.warn("[Main] Failed to create ENet client socket: " + str(error))
 		return
 		
 	multiplayer.multiplayer_peer = peer
 
 
 func _on_network_ready() -> void:
-	print("[Main] Connection handshake finalized! Changing scene to active workspace...")
-	get_tree().change_scene_to_packed(MULTIPLAYER_WORLD)
+	LoggerService.info("[Main] Connection handshake finalized! Changing scene to active workspace...")
+	get_tree().change_scene_to_file(FrameworkConfig.MULTIPLAYER_WORLD_PATH)

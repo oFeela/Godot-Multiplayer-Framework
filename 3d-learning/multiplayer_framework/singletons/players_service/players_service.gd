@@ -60,15 +60,15 @@ func _rpc_client_ready_to_spawn(player_id: String) -> void:
 	if not RunService.is_server(): 
 		return
 		
-	var incoming_peer_id = multiplayer.get_remote_sender_id()
+	var incoming_peer_id := multiplayer.get_remote_sender_id()
 	
 	if has_player(incoming_peer_id):
-		print_debug("Warning: Security Exception. Peer ", incoming_peer_id, " attempted duplicate registration!")
+		LoggerService.warn("[PlayersService] Security Exception. Peer " + str(incoming_peer_id) + " attempted duplicate registration!")
 		return
 		
 	# Store server-only mapping
 	_peer_to_player_id[incoming_peer_id] = player_id
-	print("[PlayersService] Mapped Peer %d -> Account '%s'" % [incoming_peer_id, player_id])
+	LoggerService.info("[PlayersService] Mapped Peer %d -> Account '%s'" % [incoming_peer_id, player_id])
 	
 	_register_and_sync_new_player(incoming_peer_id)
 	
@@ -147,7 +147,7 @@ func has_player(peer_id: int) -> bool:
 ## Server-only: Updates a Player's stat and replicates it out to all clients.
 func set_stat(player: Player, stat_name: String, value: Variant) -> void:
 	if not RunService.is_server():
-		print_debug("Warning: Authoritative Server rule violation. Only the server can change stats!")
+		LoggerService.warn("[PlayersService] Authoritative Server rule violation. Only the server can change stats!")
 		return
 		
 	if not player:
@@ -158,7 +158,6 @@ func set_stat(player: Player, stat_name: String, value: Variant) -> void:
 @rpc("authority", "call_local", "reliable")
 func _rpc_set_stat(peer_id: int, stat_name: String, value: Variant) -> void:
 	if has_player(peer_id):
-		print("On peer ", multiplayer.get_unique_id(), " set peer ", peer_id, " stat of ", stat_name, " to ", value)
 		_players[peer_id].stats.set_value(stat_name, value)
 		player_stat_changed.emit(_players[peer_id], stat_name, value)
 		
@@ -178,14 +177,13 @@ func get_stat(player: Player, stat_name: String, default: Variant = 0) -> Varian
 ## Server-only: Forcefully disconnects a player from the game session.
 func kick_player(player: Player, reason: String = "Kicked from server!") -> void:
 	if not RunService.is_server():
-		print_debug("Warning: Only the server can kick!")
+		LoggerService.warn("[PlayerService] Only the server can kick!")
 		return
 		
 	if not player:
 		return
 		
 	var peer_id = player.peer_id
-	print("Kicking Peer ID: ", peer_id, " Reason: ", reason)
 	
 	# For server kick
 	if peer_id == 1 or peer_id == multiplayer.get_unique_id():
@@ -274,7 +272,7 @@ func _get_player_name_from_steam(peer_id: int) -> String:
 func _on_peer_connected(peer_id: int) -> void:
 	if not RunService.is_server():
 		return
-	print("[PlayersService] Raw peer socket opened for: ", peer_id, ". Waiting for scene handshake...")
+	LoggerService.info("[PlayersService] Raw peer socket opened for: " + str(peer_id) + ". Waiting for scene handshake...")
 	
 	
 ## Server-side handling of Player creation upon peer connection.

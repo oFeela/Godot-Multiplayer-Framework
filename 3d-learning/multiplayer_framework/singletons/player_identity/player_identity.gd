@@ -16,7 +16,7 @@ var _instance_slot: int = 1
 ## OVERRIDDEN METHODS
 func _ready() -> void:
 	player_id = _resolve_player_id()
-	print("[PlayerIdentity] Active Player ID: ", player_id)
+	LoggerService.info("[PlayerIdentity] Registered Player ID: " + player_id)
 
 
 ## PRIVATES

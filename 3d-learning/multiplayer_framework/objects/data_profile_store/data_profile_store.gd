@@ -11,13 +11,9 @@ enum StoreMode {
 	CENTRALIZED
 }
 
-# HMAC secret key used for signing local P2P save payloads
-const HMAC_SECRET_KEY: String = "67Miguel67_Change_In_Production_Ok"
-
 ## VARIABLES
-@export var store_mode: StoreMode = StoreMode.P2P
-@export var store_name: String = "PlayerData"
-
+var store_mode: StoreMode = StoreMode.P2P if FrameworkConfig.MULTIPLAYER_MODE == FrameworkConfig.MultiplayerMode.P2P else StoreMode.CENTRALIZED
+var store_name: String = "PlayerData"
 var template: Dictionary = {}
 
 var _loaded_profiles: Dictionary[String, DataProfile] = {}
@@ -25,7 +21,7 @@ var _key_to_peer_id: Dictionary[String, int] = {}
 var _auto_save_timer: Timer
 
 ## OVERRIDEN METHODS
-func _init(p_store_name: String = "PlayerData", p_template: Dictionary = {}, p_mode: StoreMode = StoreMode.P2P) -> void:
+func _init(p_store_name: String = "PlayerData", p_template: Dictionary = {}, p_mode: StoreMode = StoreMode.P2P if FrameworkConfig.MULTIPLAYER_MODE == FrameworkConfig.MultiplayerMode.P2P else StoreMode.CENTRALIZED) -> void:
 	store_name = p_store_name
 	template = p_template
 	store_mode = p_mode
@@ -46,7 +42,7 @@ func _ready() -> void:
 ## The peer_id is used for rpc calls for synchronization in case of P2P.
 func load_profile(peer_id: int, key: String) -> DataProfile:
 	if not RunService.is_server():
-		push_warning("[DataProfileStore] Only server/host can call load_profile()")
+		LoggerService.warn("[DataProfileStore] Only server/host can call load_profile()!")
 		return null
 		
 	if _loaded_profiles.has(key):
@@ -82,7 +78,7 @@ func _rpc_client_submit_payload(key: String, client_package: Dictionary) -> void
 	
 	# Disallow if the sender peer does not own the corresponding key's profile
 	if _key_to_peer_id.get(key, -1) != sender_peer_id:
-		push_warning("[DataProfileStore] Security violation: Peer %d submitted payload for key '%s'" % [sender_peer_id, key])
+		LoggerService.warn("[DataProfileStore] Security violation: Peer %d submitted payload for key '%s'" % [sender_peer_id, key])
 		return
 		
 	var verified_data: Dictionary = {}
@@ -95,9 +91,9 @@ func _rpc_client_submit_payload(key: String, client_package: Dictionary) -> void
 		
 		if _verify_hmac_signature(payload_data, signature):
 			verified_data = payload_data
-			print("[DataProfileStore] HMAC Check Passed for peer %d (Key: '%s')" % [sender_peer_id, key])
+			LoggerService.info("[DataProfileStore] HMAC Check Passed for peer %d (Key: '%s')" % [sender_peer_id, key])
 		else:
-			push_warning("[DataProfileStore] HMAC CHECK FAILED! Peer %d sent tampered save payload! Resetting to template." % sender_peer_id)
+			LoggerService.warn("[DataProfileStore] HMAC CHECK FAILED! Peer %d sent tampered save payload! Resetting to template." % sender_peer_id)
 			verified_data = template.duplicate(true)
 	else:
 		verified_data = client_package.get("data", template.duplicate(true))
@@ -109,7 +105,7 @@ func _rpc_client_submit_payload(key: String, client_package: Dictionary) -> void
 ## Sets a data profile key to the given value
 func set_profile_value(profile: DataProfile, data_key: String, value: Variant) -> void:
 	if not RunService.is_server():
-		push_warning("[DataProfileStore] Non-authoritative attempt to mutate profile values!")
+		LoggerService.warn("[DataProfileStore] Non-authoritative attempt to mutate profile values!")
 		return
 		
 	if _loaded_profiles.get(profile.key, null) != profile:
@@ -135,17 +131,15 @@ func save_profile(profile: DataProfile) -> void:
 	else:
 		var target_peer_id = _key_to_peer_id.get(profile.key, 1)
 		if target_peer_id == 1 or target_peer_id == multiplayer.get_unique_id():
-			print("SERVER")
 			_write_local_disk(profile.key, profile.data)
 			profile.mark_clean()
 		else:
-			print("CLIENT")
 			_rpc_save_client_profile_to_disk.rpc_id(target_peer_id, profile.key, profile.data)
 			profile.mark_clean()
 			
 @rpc("authority", "call_remote", "reliable")
 func _rpc_save_client_profile_to_disk(key: String, validated_data: Dictionary) -> void:
-	print("[DataProfileStore] Writing Host-validated profile state to client disk.")
+	LoggerService.info("[DataProfileStore] Writing host-validated profile state to client disk.")
 	_write_local_disk(key, validated_data)
 	
 	
@@ -164,7 +158,7 @@ func unload_profile(profile: DataProfile) -> void:
 	_loaded_profiles.erase(profile.key)
 	_key_to_peer_id.erase(profile.key)
 	
-	print("[DataProfileStore:%s] Session released for profile with key: '%s'" % [store_name, profile.key])
+	LoggerService.info("[DataProfileStore:%s] Session released for profile with key: '%s'" % [store_name, profile.key])
 	profile_unloaded.emit(profile)
 	
 	
@@ -187,7 +181,7 @@ func _register_profile_session(key: String, raw_data: Dictionary) -> DataProfile
 	var profile = DataProfile.new(store_name, key, raw_data, template)
 	_loaded_profiles[key] = profile
 	
-	print("[DataProfileStore:%s] Session locked/activated for key: '%s'" % [store_name, key])
+	LoggerService.info("[DataProfileStore:%s] Session locked/activated for key: '%s'" % [store_name, key])
 	
 	profile_loaded.emit(profile)
 	return profile
@@ -196,7 +190,7 @@ func _register_profile_session(key: String, raw_data: Dictionary) -> DataProfile
 func _generate_hmac(content: String) -> String:
 	var crypto = Crypto.new()
 	var payload_with_context = store_name + ":" + content # Context-binds signature to store
-	var key_bytes = HMAC_SECRET_KEY.to_utf8_buffer()
+	var key_bytes = FrameworkConfig.HMAC_SECRET_KEY.to_utf8_buffer()
 	var content_bytes = payload_with_context.to_utf8_buffer()
 	var hmac = crypto.hmac_digest(HashingContext.HASH_SHA256, key_bytes, content_bytes)
 	return hmac.hex_encode()
@@ -244,7 +238,7 @@ func _read_local_disk(key: String) -> Dictionary:
 		if _verify_hmac_signature(package["data"], package["signature"]):
 			return package["data"]
 		else:
-			push_warning("[DataProfileStore] Local save signature invalid. Tampered data detected. Falling back to template.")
+			LoggerService.warn("[DataProfileStore] Local save signature invalid. Tampered data detected. Falling back to template.")
 			return template.duplicate(true)
 			
 	return package.get("data", template.duplicate(true))

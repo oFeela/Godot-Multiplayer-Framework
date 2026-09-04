@@ -5,9 +5,7 @@ extends RefCounted
 signal stat_changed(stat_name: String, new_value: Variant)
 
 ## VARIABLES
-var _data: Dictionary = {
-	"Level": 1
-} # {"Level": 10, "Kills": 3} as an example
+var _data: Dictionary = {} # {"Level": 10, "Kills": 3} as an example
 
 ## PUBLICS
 

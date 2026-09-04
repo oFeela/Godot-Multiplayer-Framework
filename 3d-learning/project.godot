@@ -17,10 +17,13 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-PlayersService="*uid://n07rgk7slbar"
-SteamNetwork="*uid://bwn8gn1cvx8bf"
+FrameworkConfig="*uid://cs3aht3rps6ds"
+LoggerService="*uid://b1khmvox5qenx"
 RunService="*uid://crrewascvtua1"
+SteamNetwork="*uid://bwn8gn1cvx8bf"
 PlayerIdentity="*uid://6b042t80rf0l"
+PlayersService="*uid://n07rgk7slbar"
+NetworkSpawnerService="*uid://6f6v8e1c21p4"
 PlayerDataManager="*uid://6e6iujoq2xyl"
 
 [display]

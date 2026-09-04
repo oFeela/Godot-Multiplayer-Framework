@@ -3,20 +3,15 @@ extends Node3D # Or 2D
 ## according to the game's needs (2D or 3D).
 
 ## VARIABLES
-@export var player_character_scene := preload("uid://bg4uh6g3e6swi")
-@export var auto_spawn: bool = true
-@export var respawn_time: float = 3.0
+@export var auto_spawn: bool = FrameworkConfig.PLAYER_AUTO_SPAWN
+@export var respawn_time: float = FrameworkConfig.PLAYER_RESPAWN_TIME
 
 var server_is_shutting_down: bool = false
 
-@onready var player_characters_container = $PlayerCharactersContainer
-@onready var multiplayer_spawner = $MultiplayerSpawner
-
 ## OVERRIDEN METHODS
 func _ready() -> void:
-	multiplayer_spawner.spawn_path = player_characters_container.get_path()
-	if multiplayer_spawner.get_spawnable_scene_count() == 0:
-		multiplayer_spawner.add_spawnable_scene(player_character_scene.resource_path)
+	# So anything instantiated by the service will automatically be parented here
+	NetworkSpawnerService.set_spawn_container(self)
 	
 	# PlayersService connections
 	PlayersService.player_added.connect(_on_player_joined_server)
@@ -33,26 +28,27 @@ func _ready() -> void:
 		
 	# For the current client leaving, 'server_shutting_down' will be fired
 	PlayersService.server_shutting_down.connect(func():
-		print("Disconnected from server!")
+		LoggerService.info("Disconnected from server!")
 		server_is_shutting_down = true
 	)
 	
 	# Change back to main menu
 	multiplayer.server_disconnected.connect(func():
-		get_tree().change_scene_to_file.call_deferred("res://multiplayer_framework/scenes/main/main.tscn")
+		get_tree().change_scene_to_file.call_deferred(FrameworkConfig.MAIN_MENU_PATH)
 	)
 		
 	# Additional logic as needed (e.g. data store, etc.)
 	if RunService.is_server():
 		while true:
 			await get_tree().create_timer(1).timeout
-			print(PlayerDataManager._profiles)
+			LoggerService.debug(PlayerDataManager._profiles)
 			for p: Player in PlayersService.get_players():
 				var profile = PlayerDataManager._profiles.get(p, null)
 				if not profile: continue
 				
 				profile.set_value("coins", profile.get_value("coins", 0) + 100)
-				print(p.name, profile.data)
+				LoggerService.debug(p.name)
+				LoggerService.debug(profile.data)
 		pass
 	
 	
@@ -74,12 +70,6 @@ func spawn_player_character(player: Player) -> void:
 		player.character = null
 		old_char.queue_free()
 		
-	var new_character := player_character_scene.instantiate()
-	new_character.name = str(player.peer_id)
-	
-	# Sync, authority will transfer to the client by now
-	player_characters_container.add_child(new_character)
-	
 	# Find a spawn point
 	var spawn_position = Vector3.ZERO if self is Node3D else Vector2.ZERO
 	var spawn_points := _find_spawn_points(self)
@@ -87,6 +77,13 @@ func spawn_player_character(player: Player) -> void:
 	if spawn_points.size() > 0:
 		var random_spawn = spawn_points.pick_random()
 		spawn_position = random_spawn.global_position
+		
+	var new_character := NetworkSpawnerService.instantiate_entity(
+		"player", 
+		spawn_position
+	)
+	new_character.name = str(player.peer_id)
+	NetworkSpawnerService.replicate_entity(new_character, self)
 		
 	# Register to PlayersService, 
 	# the character should have been replicated by now to other clients
@@ -111,7 +108,7 @@ func _rpc_force_reposition(target_position: Variant) -> void:
 		PlayersService.local_player.character.global_position = target_position
 	else:
 		# Another attempt in case it's missing for whatever reason (delayed set)
-		var character = player_characters_container.get_node_or_null(str(multiplayer.get_unique_id()))
+		var character = get_node_or_null(str(multiplayer.get_unique_id()))
 		if character and is_instance_valid(character):
 			character.global_position = target_position
 	
@@ -125,7 +122,7 @@ func _on_player_character_freed(player: Player):
 	if server_is_shutting_down or not player in PlayersService.get_players():
 		return
 		
-	print("[Workspace] ", player.name, " avatar was freed. Initiating ", "%.1f" % respawn_time, "-second respawn...")
+	LoggerService.info(player.name + " avatar was freed. Initiating " + "%.1f" % respawn_time + "-second respawn...")
 	await get_tree().create_timer(respawn_time).timeout
 	
 	if server_is_shutting_down or not player in PlayersService.get_players():
@@ -160,4 +157,4 @@ func _on_player_joined_server(player: Player) -> void:
 		
 ## Server-Authoritative clean up
 func _on_player_left_server(player: Player) -> void:
-	print(player.name, " left the server!")
+	LoggerService.info(player.name + " left the server!")

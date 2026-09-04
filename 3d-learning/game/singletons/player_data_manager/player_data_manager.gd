@@ -79,7 +79,7 @@ func _on_profile_ready(player: Player, profile: DataProfile) -> void:
 	# Just in case they did not disconnect
 	if player in PlayersService.get_players():
 		_profiles[player] = profile
-		print("[PlayerDataManager] Profile loaded for %s!" % player.name)
+		LoggerService.info("[PlayerDataManager] Profile loaded for %s!" % player.name)
 		
 		# Usage exmaple
 		profile.data["coins"] += 100 # Direct but won't trigger signal/flag, TLDR: NEVER USE THIS
@@ -101,7 +101,7 @@ func _on_server_shutting_down() -> void:
 	if not RunService.is_server():
 		return
 		
-	print("[PlayerDataManager] Server shutting down, flushing all active profiles...")
+	LoggerService.info("[PlayerDataManager] Server shutting down, flushing all active profiles...")
 	
 	var active_players = _profiles.keys().duplicate()
 	for player in active_players:
