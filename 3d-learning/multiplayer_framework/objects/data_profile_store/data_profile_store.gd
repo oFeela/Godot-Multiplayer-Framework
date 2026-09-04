@@ -29,7 +29,7 @@ func _init(p_store_name: String = "PlayerData", p_template: Dictionary = {}, p_m
 	
 func _ready() -> void:
 	_auto_save_timer = Timer.new()
-	_auto_save_timer.wait_time = 60.0
+	_auto_save_timer.wait_time = FrameworkConfig.DATA_STORE_AUTO_SAVE_TIME
 	_auto_save_timer.autostart = true
 	_auto_save_timer.timeout.connect(save_all)
 	add_child(_auto_save_timer)

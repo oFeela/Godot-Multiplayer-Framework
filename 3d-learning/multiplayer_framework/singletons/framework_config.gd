@@ -24,3 +24,4 @@ const INITIAL_REGISTERED_SCENES: Dictionary[String, PackedScene] = {
 
 const PLAYER_AUTO_SPAWN := true
 const PLAYER_RESPAWN_TIME := 3.0
+const DATA_STORE_AUTO_SAVE_TIME := 15.0
