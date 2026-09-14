@@ -7,6 +7,7 @@ extends Node
 
 ## CONSTANTS
 const PLAYER_DATA_STORE_NAME := "PlayerData_1"
+const DATA_REPLICA_NAME_PREFIX := "PlayerData_"
 const DATA_STORE_MODE := DataProfileStore.StoreMode.P2P
 const PLAYER_TEMPLATE := {
 	"coins": 100,
@@ -99,7 +100,7 @@ func _on_profile_ready(player: Player, profile: DataProfile) -> void:
 		var peer_id = player.peer_id
 		var player_id = PlayersService.get_player_id_from_peer_id(peer_id)
 		
-		var replica_name := "PlayerData_" + str(player_id)
+		var replica_name := DATA_REPLICA_NAME_PREFIX + str(player_id)
 		var replica := DataReplicaService.create_replica(
 			replica_name,
 			profile.data

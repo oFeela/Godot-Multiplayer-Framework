@@ -27,6 +27,7 @@ NetworkSpawnerService="*uid://6f6v8e1c21p4"
 PlayerDataManager="*uid://6e6iujoq2xyl"
 MultiplayerService="*uid://dg14yxvt2uk42"
 DataReplicaService="*uid://c1mrbb54qoptq"
+DataReplicaManager="*uid://2vcs430q7cjl"
 
 [display]
 
