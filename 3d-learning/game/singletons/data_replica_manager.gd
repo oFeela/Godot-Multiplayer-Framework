@@ -28,20 +28,16 @@ func get_replica(replica_name: String, timeout: float = 5.0) -> DataReplica:
 	if _replicas.has(replica_name):
 		return _replicas[replica_name]
 		
-	# Create timer if definite timeout
-	var timer: SceneTreeTimer = null
-	if timeout > 0.0:
-		timer = get_tree().create_timer(timeout)
-		
 	# Repeat until data_replica_ready is emitted + found the target replica
+	var start_time := Time.get_ticks_msec()
+	timeout = int(timeout * 1000)
+	
 	while not _replicas.has(replica_name):
-		if timer and timer.time_left <= 0.0:
+		if timeout > 0 and (Time.get_ticks_msec() - start_time) >= timeout:
 			LoggerService.warn("[ReplicaManager] Timed out waiting for replica '%s'" % replica_name)
 			return null
 		
-		var replica: DataReplica = await data_replica_ready
-		if replica.name == replica_name:
-			return replica
+		await get_tree().process_frame
 			
 	# Return NULL
 	return _replicas.get(replica_name, null)

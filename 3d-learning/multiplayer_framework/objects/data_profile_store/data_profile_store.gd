@@ -40,7 +40,8 @@ func _ready() -> void:
 
 ## Loads a profile with the corresponding key and peer_id as the owner of the profile.
 ## The peer_id is used for rpc calls for synchronization in case of P2P.
-func load_profile(peer_id: int, key: String) -> DataProfile:
+## Will wait asynchronously until the profile is loaded within 'timeout' seconds (0.0 for indefinite).
+func load_profile(peer_id: int, key: String, timeout: float = 5.0) -> DataProfile:
 	if not RunService.is_server():
 		LoggerService.warn("[DataProfileStore] Only server/host can call load_profile()!")
 		return null
@@ -61,7 +62,18 @@ func load_profile(peer_id: int, key: String) -> DataProfile:
 		else:
 			# If client, then request client for their data
 			_rpc_request_client_payload.rpc_id(peer_id, key)
-			return null
+				
+			var start_time := Time.get_ticks_msec()
+			timeout = int(timeout * 1000)
+			
+			while not _loaded_profiles.has(key):
+				if timeout > 0 and (Time.get_ticks_msec() - start_time) >= timeout:
+					LoggerService.warn("[DataProfileStore] Timeout when fetching data from client to load profile %s." % key)
+					return null
+					
+				await get_tree().process_frame
+					
+			return _loaded_profiles.get(key, null)
 			
 # 'call_remote' because server won't need to call this. Already loaded automatically.
 @rpc("authority", "call_remote", "reliable")
