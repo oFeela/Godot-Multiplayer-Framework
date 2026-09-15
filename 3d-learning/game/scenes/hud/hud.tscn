@@ -12,3 +12,11 @@ offset_bottom = 40.0
 [node name="Coins" type="Label" parent="VBoxContainer" unique_id=1793306722]
 layout_mode = 2
 text = "COINS: XXX"
+
+[node name="Give" type="Button" parent="VBoxContainer" unique_id=518615358]
+layout_mode = 2
+text = "GIVE COINS"
+
+[node name="Buy" type="Button" parent="VBoxContainer" unique_id=736101463]
+layout_mode = 2
+text = "BUY STUFF"

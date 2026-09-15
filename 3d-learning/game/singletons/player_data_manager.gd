@@ -61,29 +61,13 @@ func _on_player_added(player: Player):
 	# Load the profile using the validated account player_id as the key
 	var peer_id = player.peer_id
 	var player_id = PlayersService.get_player_id_from_peer_id(peer_id)
-	var profile = player_data_store.load_profile(peer_id, player_id)
+	var profile = await player_data_store.load_profile(peer_id, player_id)
 	
 	if profile:
 		_on_profile_ready(player, profile)
 	else:
-		if player_data_store.store_mode == DataProfileStore.StoreMode.P2P:
-			# Wait for arrival
-			var wrapper: Array[Callable] = []
-
-			wrapper.append(func(key: String):
-				if key == player_id:
-					var loaded_profile = player_data_store.get_profile(key)
-					if loaded_profile:
-						_on_profile_ready(player, loaded_profile)
-						
-					# Properly disconnects because wrapper[0] evaluates to the actual Callable
-					if player_data_store.client_payload_received.is_connected(wrapper[0]):
-						player_data_store.client_payload_received.disconnect(wrapper[0])
-			)
-
-			player_data_store.client_payload_received.connect(wrapper[0])
-		else:
-			PlayersService.kick_player(player, "Data failed to load. Please rejoin!")
+		LoggerService.warn("[Server] Failed to load data profile for player_id: %s (peer: %d)" % [player_id, peer_id])
+		PlayersService.kick_player(player, "Data failed to load. Please rejoin!")
 		
 		
 func _on_profile_ready(player: Player, profile: DataProfile) -> void:
