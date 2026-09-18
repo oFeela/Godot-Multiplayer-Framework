@@ -79,7 +79,7 @@ func join_game(use_steam: bool = FrameworkConfig.DEFAULT_USE_STEAM, address: Str
 func _on_network_ready() -> void:
 	LoggerService.info("[MultiplayerService] Network ready! Transitioning to world scene...")
 	session_started.emit()
-	get_tree().change_scene_to_file(FrameworkConfig.MULTIPLAYER_WORLD_PATH)
+	get_tree().change_scene_to_file(FrameworkConfig.MAIN_GAME_WORLD_PATH)
 
 ## Callback triggered when an ENet connection attempt fails.
 func _on_network_failed() -> void:

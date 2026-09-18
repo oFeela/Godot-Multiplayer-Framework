@@ -39,14 +39,14 @@ const DEFAULT_MAX_PLAYERS := 4
 const DEFAULT_USE_STEAM := false
 
 ## UID path to the main multiplayer world/game scene.
-const MULTIPLAYER_WORLD_PATH := "uid://e5owhf6b1sn7"
+const MAIN_GAME_WORLD_PATH := "uid://dwpg3cdmu3csl"
 
 ## UID path to the main menu UI scene.
 const MAIN_MENU_PATH := "uid://cxy3auj6iey8l"
 
 ## Pre-cached registry of core framework scenes mapped to string keys.
 const INITIAL_REGISTERED_SCENES: Dictionary[String, PackedScene] = {
-	"player": preload("uid://bg4uh6g3e6swi")
+	"player_character": preload("uid://bg4uh6g3e6swi") # Change this to the game's player character scene
 }
 
 ## Pre-cached registry of core framework audio streams mapped to string keys.

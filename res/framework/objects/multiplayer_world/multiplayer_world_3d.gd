@@ -1,11 +1,9 @@
 ## Base world controller managing player avatar spawning, spatial positioning, and scene lifecycle.
 ##
 ## [MultiplayerWorld] coordinates with [NetworkSpawnerService] and [PlayersService] to automatically
-## spawn player characters at designated [PlayerCharacterSpawnPoint] locations, handle death/respawn timers,
+## spawn player characters at designated [Marker3D] locations, handle death/respawn timers,
 ## and manage scene navigation upon server disconnection.
-##
-## [b]Note:[/b] Inherit or adjust base class to [Node2D] or [Node3D] depending on your project dimensions.
-class_name MultiplayerWorld
+class_name MultiplayerWorld3D
 extends Node3D
 
 ## VARIABLES
@@ -63,7 +61,7 @@ func spawn_player_character(player: Player) -> void:
 		old_char.queue_free()
 		
 	# Find a spawn point
-	var spawn_position = Vector3.ZERO if self is Node3D else Vector2.ZERO
+	var spawn_position = Vector3.ZERO
 	var spawn_points := _find_spawn_points(self)
 	
 	if spawn_points.size() > 0:
@@ -71,7 +69,7 @@ func spawn_player_character(player: Player) -> void:
 		spawn_position = random_spawn.global_position
 		
 	var new_character := NetworkSpawnerService.instantiate_entity(
-		"player", 
+		"player_character", 
 		spawn_position
 	)
 	new_character.name = str(player.peer_id)
@@ -89,8 +87,8 @@ func spawn_player_character(player: Player) -> void:
 
 ## Server-Only: Forces a client peer to override their character's global spatial position.
 ## [param player]: The target [Player] instance.
-## [param target_position]: The target spatial position ([Vector3] or [Vector2]).
-func force_reposition(player: Player, target_position: Variant) -> void:
+## [param target_position]: The target spatial position ([Vector3]).
+func force_reposition(player: Player, target_position: Vector3) -> void:
 	if not RunService.is_server():
 		return
 	
@@ -98,7 +96,7 @@ func force_reposition(player: Player, target_position: Variant) -> void:
 
 ## RPC handler setting local character position on the authoritative target client.
 @rpc("authority", "call_local", "reliable")
-func _rpc_force_reposition(target_position: Variant) -> void:
+func _rpc_force_reposition(target_position: Vector3) -> void:
 	if PlayersService.local_player:
 		PlayersService.local_player.character.global_position = target_position
 	else:
@@ -124,11 +122,11 @@ func _on_player_character_freed(player: Player):
 	# They won't respawn if 'auto_spawn' is false already handled inside.
 	_on_player_joined_server(player)
 
-## Recursively scans the scene hierarchy to locate all active [PlayerCharacterSpawnPoint] nodes.
-func _find_spawn_points(curr_node: Node) -> Array[PlayerCharacterSpawnPoint]:
-	var results: Array[PlayerCharacterSpawnPoint] = []
+## Recursively scans the scene hierarchy to locate all active [Marker3D] nodes.
+func _find_spawn_points(curr_node: Node) -> Array[Marker3D]:
+	var results: Array[Marker3D] = []
 	
-	if curr_node is PlayerCharacterSpawnPoint:
+	if curr_node is Marker3D:
 		results.append(curr_node)
 	
 	for child in curr_node.get_children():

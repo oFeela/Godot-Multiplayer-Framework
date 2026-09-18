@@ -25,7 +25,7 @@ A server-authoritative multiplayer framework engineered for Godot 4. Built to ac
 | **Configuration & Runtime** | `FrameworkConfig`<br>`RunService`<br>`LoggerService` | Global constants, runtime environment checking (`is_server`, `is_client`), and level-filtered logging. |
 | **Transport & Networking** | `MultiplayerService`<br>`SteamLobbyService` | Low-level socket management (ENet) and Steam P2P relay matchmaking. |
 | **Identity & Sessions** | `PlayersService`<br>`PlayerIdentity`<br>`Player` / `PlayerStats` | Authoritative player registry, account identity resolution (Steam ID/UUID), and player stats. |
-| **World & Spawning** | `MultiplayerWorld`<br>`NetworkSpawnerService`<br>`PlayerCharacterSpawnPoint` | Spatial map management, dynamic entity instantiation, and automatic network replication. |
+| **World & Spawning** | `MultiplayerWorld2D/3D`<br>`NetworkSpawnerService` | Spatial map management, dynamic entity instantiation, and automatic network replication. |
 | **RPC & Event Pipeline** | `NetworkSignalService` | Decoupled event routing (`fire_server`, `fire_client`) and async two-way calls (`invoke_server`). |
 | **State Replication** | `DataReplicaService`<br>`DataReplica` | Server-authoritative reactive state synchronization with path-based mutation listeners. |
 | **Persistence & Utilities** | `DataProfileStore`<br>`DataProfile`<br>`GroupService`<br>`SoundService` | Session-locked storage with HMAC SHA-256 validation, node tagging, and 2D/3D spatial audio. |
@@ -50,7 +50,7 @@ graph TD
 	end
 
 	subgraph World [World & Entity Spawning]
-		MW[MultiplayerWorld]
+		MW[MultiplayerWorld2D/3D]
 		NSS[NetworkSpawnerService]
 	end
 
@@ -103,7 +103,7 @@ In Godot, navigate to **Project → Project Settings → Autoload (or Globals)**
 
 * **Steam P2P Integration**: To host/join via Steam (`use_steam = true`), you must build your engine with **GodotSteam** or install the GodotSteam plugin in `res://addons/`, and place a valid `steam_appid.txt` in your project root.
 * **Server Authority**: Logic enforcement must always occur on the server. Clients should request actions via `NetworkSignalService.fire_server()` or `invoke_server()` instead of mutating state locally.
-* **Spawn Container Binding**: Always call `NetworkSpawnerService.set_spawn_container()` during map scene initialization so networked entities instantiate under the proper scene tree node.
+* **Spawn Container Binding**: Always call `NetworkSpawnerService.set_spawn_container()` during map scene initialization so networked entities instantiate under the proper scene tree node. This can be bypassed if the scene inherits from MultiplayerWorld2D/3D.
 
 ---
 
@@ -148,6 +148,42 @@ func _ready() -> void:
 
 func _on_player_added(player: Player) -> void:
 	LoggerService.info("Player joined: %s (Peer ID: %d)" % [player.name, player.peer_id])
+```
+
+### 5. Creating a Multiplayer Scene (MultiplayerWorld2D/3D)
+To make any scene function as a multiplayer map, extend MultiplayerWorld in your level's root script. Do not edit framework core scripts directly!
+
+1. Create a scene res://demo/Level1.tscn (Node3D or Node2D).
+
+2. Add one or more Marker2D/3D nodes anywhere in the level tree as the player character spawn point(s).
+
+3. Attach a script to the level root extending MultiplayerWorld2D/3D:
+
+```gdscript
+extends MultiplayerWorld2D # (or MultiplayerWorld3D)
+
+func _ready() -> void:
+	super._ready() # Scans for spawn points and binds player lifecycle hooks
+	
+	if RunService.is_server():
+		LoggerService.info("Multiplayer world initialized successfully!")
+```
+
+### 6. Final Step
+You MUST change these settings in `res://framework/singletons/FrameworkConfig.gd` according to your game's structure, otherwise players will be unable to load upon connection (unless `auto_spawn` of MultiplayerWorld2D/3D is disabled).
+```gdscript
+# FrameworkConfig.gd
+
+## UID path to the main multiplayer world/game scene.
+const MAIN_GAME_WORLD_PATH := ""
+
+## UID path to the main menu UI scene.
+const MAIN_MENU_PATH := ""
+
+## Pre-cached registry of core framework scenes mapped to string keys.
+const INITIAL_REGISTERED_SCENES: Dictionary[String, PackedScene] = {
+	"player_character": preload("") # Change this to the game's player character scene
+}
 ```
 
 ---
@@ -383,8 +419,8 @@ KeyValue container for player stats and metrics with change signals.
 
 ---
 
-### `MultiplayerWorld` (Node3D / Node2D Base Class)
-Base scene manager for multiplayer maps, controlling spawn positioning, character instantiation, respawns, and disconnection transitions.
+### `MultiplayerWorld2D/3D` (Node2D / Node3D)
+An inheritable class for multiplayer maps, controlling spawn positioning, character instantiation, respawns, and disconnection transitions.
 
 #### Properties
 * `auto_spawn: bool`: Toggles automatic avatar spawning on player join and death.
@@ -395,11 +431,6 @@ Base scene manager for multiplayer maps, controlling spawn positioning, characte
   *Server only.* Instantiates, parents, and replicates a player's character node at a random `PlayerCharacterSpawnPoint`.
 * `force_reposition(player: Player, target_position: Variant) -> void`  
   *Server only.* Overrides a client's character position via targeted RPC.
-
-
-
-### `PlayerCharacterSpawnPoint` (Marker3D / Marker2D)
-Spatial marker node indicating valid spawn and respawn transform coordinates for player avatars.
 
 
 

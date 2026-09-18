@@ -1,6 +1,0 @@
-[gd_scene format=3 uid="uid://c1xh0h4w0bo3c"]
-
-[ext_resource type="Script" uid="uid://xqpi4yltss47" path="res://framework/scenes/player_character_spawn_points/player_character_spawn_point.gd" id="1_fjj2i"]
-
-[node name="PlayerCharacterSpawnPoint" type="Marker3D" unique_id=465496981]
-script = ExtResource("1_fjj2i")
