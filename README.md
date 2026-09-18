@@ -84,18 +84,18 @@ In Godot, navigate to **Project → Project Settings → Autoload (or Globals)**
 
 | Order | Autoload Name | Script Path | Core Responsibility |
 | :---: | :--- | :--- | :--- |
-| **1** | `FrameworkConfig` | `res://framework/singletons/FrameworkConfig.gd` | Global parameters & enums |
-| **2** | `RunService` | `res://framework/singletons/RunService.gd` | Environment detection (`is_server`, `is_client`) |
-| **3** | `LoggerService` | `res://framework/singletons/LoggerService.gd` | Centralized level-based logger |
-| **4** | `PlayerIdentity` | `res://framework/singletons/PlayerIdentity.gd` | Account ID & Steam ID resolution |
-| **5** | `PlayersService` | `res://framework/singletons/PlayersService.gd` | Authoritative session player registry |
-| **6** | `SteamLobbyService` | `res://framework/singletons/SteamLobbyService.gd` | Steam P2P match & lobby manager |
-| **7** | `MultiplayerService` | `res://framework/singletons/MultiplayerService.gd` | ENet & Steam socket connection driver |
-| **8** | `NetworkSpawnerService` | `res://framework/singletons/NetworkSpawnerService.gd` | Networked entity instantiation & tracking |
-| **9** | `NetworkSignalService` | `res://framework/singletons/NetworkSignalService.gd` | Decoupled RPC & async event pipeline |
-| **10** | `DataReplicaService` | `res://framework/singletons/DataReplicaService.gd` | Reactive state synchronization manager |
-| **11** | `GroupService` | `res://framework/singletons/GroupService.gd` | Dynamic entity node tagging & tracking |
-| **12** | `SoundService` | `res://framework/singletons/SoundService.gd` | Replicated 2D/3D spatial audio driver |
+| **1** | `FrameworkConfig` | `res://framework/singletons/framework_config.gd` | Global parameters & enums |
+| **2** | `RunService` | `res://framework/singletons/run_service.gd` | Environment detection (`is_server`, `is_client`) |
+| **3** | `LoggerService` | `res://framework/singletons/logger_service.gd` | Centralized level-based logger |
+| **4** | `PlayerIdentity` | `res://framework/singletons/player_identity.gd` | Account ID & Steam ID resolution |
+| **5** | `PlayersService` | `res://framework/singletons/players_service.gd` | Authoritative session player registry |
+| **6** | `SteamLobbyService` | `res://framework/singletons/steam_lobby_service.gd` | Steam P2P match & lobby manager |
+| **7** | `MultiplayerService` | `res://framework/singletons/multiplayer_service.gd` | ENet & Steam socket connection driver |
+| **8** | `NetworkSpawnerService` | `res://framework/singletons/network_spawner_service.gd` | Networked entity instantiation & tracking |
+| **9** | `NetworkSignalService` | `res://framework/singletons/network_signal_service.gd` | Decoupled RPC & async event pipeline |
+| **10** | `DataReplicaService` | `res://framework/singletons/data_replica_service.gd` | Reactive state synchronization manager |
+| **11** | `GroupService` | `res://framework/singletons/group_service.gd` | Dynamic entity node tagging & tracking |
+| **12** | `SoundService` | `res://framework/singletons/sound_service.gd` | Replicated 2D/3D spatial audio driver |
 
 ---
 
@@ -110,7 +110,7 @@ In Godot, navigate to **Project → Project Settings → Autoload (or Globals)**
 ## 🚀 Quick Start Guide
 
 ### 1. Configure Global Options
-Set runtime behavior in `res://framework/singletons/FrameworkConfig.gd`:
+Set runtime behavior in `res://framework/singletons/framework_config.gd`:
 
 ```gdscript
 # FrameworkConfig.gd
@@ -170,7 +170,7 @@ func _ready() -> void:
 ```
 
 ### 6. Final Step
-You MUST change these settings in `res://framework/singletons/FrameworkConfig.gd` according to your game's structure, otherwise players will be unable to load upon connection (unless `auto_spawn` of MultiplayerWorld2D/3D is disabled).
+You MUST change these settings in `res://framework/singletons/framework_config.gd` according to your game's structure, otherwise players will be unable to load upon connection (unless `auto_spawn` of MultiplayerWorld2D/3D is disabled).
 ```gdscript
 # FrameworkConfig.gd
 
