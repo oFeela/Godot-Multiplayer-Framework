@@ -607,7 +607,6 @@ res://
 ├── demo/                      # Example playable demo scene & integration showcases
 └── framework/                 # Core Framework Package
     ├── objects/               # Reference-counted data models & helper nodes
-    ├── scenes/                # Scene base nodes and spawn markers
     └── singletons/            # Mandatory Autoload Singletons
 ```
 
