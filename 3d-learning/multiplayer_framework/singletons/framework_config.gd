@@ -21,6 +21,7 @@ const MAIN_MENU_PATH := "uid://cxy3auj6iey8l"
 const INITIAL_REGISTERED_SCENES: Dictionary[String, PackedScene] = {
 	"player": preload("uid://bg4uh6g3e6swi")
 }
+const INITIAL_REGISTERED_SOUNDS: Dictionary[String, AudioStream] = {}
 
 const PLAYER_AUTO_SPAWN := true
 const PLAYER_RESPAWN_TIME := 3.0

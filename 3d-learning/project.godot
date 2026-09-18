@@ -29,6 +29,7 @@ MultiplayerService="*uid://dg14yxvt2uk42"
 DataReplicaService="*uid://c1mrbb54qoptq"
 DataReplicaManager="*uid://2vcs430q7cjl"
 NetworkSignalService="*uid://fb070utc4qb1"
+SoundService="*uid://c4jsovnw33oyh"
 
 [display]
 
