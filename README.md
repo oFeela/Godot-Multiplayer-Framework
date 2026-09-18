@@ -103,7 +103,7 @@ In Godot, navigate to **Project → Project Settings → Autoload (or Globals)**
 
 * **Steam P2P Integration**: To host/join via Steam (`use_steam = true`), you must build your engine with **GodotSteam** or install the GodotSteam plugin in `res://addons/`, and place a valid `steam_appid.txt` in your project root.
 * **Server Authority**: Logic enforcement must always occur on the server. Clients should request actions via `NetworkSignalService.fire_server()` or `invoke_server()` instead of mutating state locally.
-* **Spawn Container Binding**: Always call `NetworkSpawnerService.set_spawn_container()` during map scene initialization so networked entities instantiate under the proper scene tree node. This can be bypassed if the scene inherits from MultiplayerWorld2D/3D.
+* **Spawn Container Binding**: Always call `NetworkSpawnerService.set_spawn_container()` during map scene initialization so networked entities instantiate under the proper scene tree node. This can be bypassed if the scene inherits from `MultiplayerWorld2D/3D`.
 
 ---
 
@@ -150,7 +150,7 @@ func _on_player_added(player: Player) -> void:
 	LoggerService.info("Player joined: %s (Peer ID: %d)" % [player.name, player.peer_id])
 ```
 
-### 5. Creating a Multiplayer Scene (MultiplayerWorld2D/3D)
+### 5. Creating a Multiplayer Scene (`MultiplayerWorld2D/3D`)
 To make any scene function as a multiplayer map, extend MultiplayerWorld in your level's root script. Do not edit framework core scripts directly!
 
 1. Create a scene res://demo/Level1.tscn (Node3D or Node2D).
