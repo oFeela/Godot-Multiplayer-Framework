@@ -2,7 +2,7 @@ extends Node
 
 ## VARIABLES
 ## Map scene keys (e.g., "coin", "fireball") to scene files
-@export var registered_scenes: Dictionary[String, PackedScene] = FrameworkConfig.INITIAL_REGISTERED_SCENES
+@export var registered_scenes: Dictionary[String, PackedScene] = FrameworkConfig.INITIAL_REGISTERED_SCENES.duplicate()
 
 var _multiplayer_spawner: MultiplayerSpawner
 var _spawn_container: Node
