@@ -34,7 +34,7 @@ func get_replica(replica_name: String, timeout: float = 5.0) -> DataReplica:
 	
 	while not _replicas.has(replica_name):
 		if timeout > 0 and (Time.get_ticks_msec() - start_time) >= timeout:
-			LoggerService.warn("[ReplicaManager] Timed out waiting for replica '%s'" % replica_name)
+			LoggerService.warn("[DataReplicaManager] Timed out waiting for replica '%s'" % replica_name)
 			return null
 		
 		await get_tree().process_frame
