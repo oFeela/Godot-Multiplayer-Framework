@@ -107,7 +107,7 @@ In Godot, navigate to **Project → Project Settings → Autoload (or Globals)**
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start Guide (Refer to `res://demo/` for examples)
 
 ### 1. Configure Global Options
 Set runtime behavior in `res://framework/singletons/framework_config.gd`:
@@ -155,9 +155,9 @@ To make any scene function as a multiplayer map, extend MultiplayerWorld in your
 
 1. Create a scene res://demo/Level1.tscn (Node3D or Node2D).
 
-2. Add one or more Marker2D/3D nodes anywhere in the level tree as the player character spawn point(s).
+2. Add one or more `Marker2D/3D` nodes anywhere in the level tree as the player character spawn point(s).
 
-3. Attach a script to the level root extending MultiplayerWorld2D/3D:
+3. Attach a script to the level root extending `MultiplayerWorld2D/3D`:
 
 ```gdscript
 extends MultiplayerWorld2D # (or MultiplayerWorld3D)
@@ -169,8 +169,20 @@ func _ready() -> void:
 		LoggerService.info("Multiplayer world initialized successfully!")
 ```
 
-### 6. Final Step
-You MUST change these settings in `res://framework/singletons/framework_config.gd` according to your game's structure, otherwise players will be unable to load upon connection (unless `auto_spawn` of MultiplayerWorld2D/3D is disabled).
+### 6. Creating Player character
+To make a player character scene, ensure:
+1. It has a `MultiplayerSynchronizer`syncing `position` and `rotation` properties of the root node.
+2. Attach a script to the root which MUST contain the following to guarantee working authority transfer:
+```gdscript
+func _enter_tree() -> void:
+	set_multiplayer_authority(int(name))
+```
+
+### 7. Creating Main Menu
+Create the game's main scene, which serves as the return point after a player disconnects.
+
+### 8. Final Step
+You MUST change these settings in `res://framework/singletons/framework_config.gd` according to your game's structure, otherwise players will be unable to load upon connection (unless `auto_spawn` of `MultiplayerWorld2D/3D` is disabled).
 ```gdscript
 # FrameworkConfig.gd
 
